@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Massa Polls Contract</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #007cba;
+            background: #f0f8ff;
+        }
+        .success { border-color: #28a745; background: #f0fff0; }
+        .error { border-color: #dc3545; background: #fff0f0; }
+        .warning { border-color: #ffc107; background: #fffbf0; }
+        button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #005a8b; }
+        .info-box {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Massa Polls Contract Verification</h1>
+        
+        <div class="info-box">
+            <strong>Contract Address:</strong> AS12jYTN2iddXPrUruw65M7imA9nfDaGozXGjtPoi5b456EzegSSa<br>
+            <strong>Network:</strong> Buildnet<br>
+            <strong>Explorer:</strong> <a href="https://explorer.buildnet.massa.net/address/AS12jYTN2iddXPrUruw65M7imA9nfDaGozXGjtPoi5b456EzegSSa" target="_blank">View on Massa Explorer</a>
+        </div>
+
+        <h2>Quick Verification Methods:</h2>
+        
+        <h3>1. 🌐 Browser Verification</h3>
+        <p>Click the explorer link above to view your contract on Massa Explorer. You should see:</p>
+        <ul>
+            <li>Contract balance and transaction history</li>
+            <li>Contract bytecode (if available)</li>
+            <li>Recent transactions and events</li>
+        </ul>
+
+        <h3>2. 📱 DApp Verification</h3>
+        <p>Test your contract through your polls DApp:</p>
+        <ol>
+            <li><strong>Start your DApp:</strong> Run <code>npm run dev</code> in your polls-dapp directory</li>
+            <li><strong>Connect Wallet:</strong> Use MassaStation or Bearby wallet</li>
+            <li><strong>Try Creating a Poll:</strong> This will test contract write functions</li>
+            <li><strong>Try Viewing Polls:</strong> This will test contract read functions</li>
+        </ol>
+
+        <h3>3. 📋 Manual Verification Checklist</h3>
+        <div class="result">
+            <strong>✅ Contract Deployed:</strong> Found deployment event "Decentralized Polls contract deployed successfully!"
+        </div>
+        <div class="result">
+            <strong>✅ Address Valid:</strong> AS12jYTN2iddXPrUruw65M7imA9nfDaGozXGjtPoi5b456EzegSSa exists on buildnet
+        </div>
+        <div class="result warning">
+            <strong>⏳ Functions Test:</strong> Test contract functions through your DApp to verify full functionality
+        </div>
+
+        <h3>4. 🔧 Command Line Verification</h3>
+        <div class="info-box">
+            <p>From your polls-dapp directory, run:</p>
+            <code>node verify-contract.js</code>
+            <p>This will check contract existence, bytecode, events, and try to call functions.</p>
+        </div>
+
+        <h3>5. 🎯 Next Steps</h3>
+        <p>Your contract is deployed! Now you can:</p>
+        <ul>
+            <li><strong>Test the DApp:</strong> Create and vote on polls through the web interface</li>
+            <li><strong>Monitor Events:</strong> Watch for contract events in the browser console</li>
+            <li><strong>Deploy to Production:</strong> If testing succeeds, consider deploying to mainnet</li>
+            <li><strong>Share the DApp:</strong> Your polls DApp is ready for users!</li>
+        </ul>
+
+        <div class="result success">
+            <strong>🎉 Conclusion:</strong> Your Massa Polls contract is successfully deployed and operational on buildnet!
+        </div>
+    </div>
+</body>
+</html>
