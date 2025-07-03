@@ -480,4 +480,5 @@ export class PollsContract {
 }
 
 // Create a singleton instance
-export const pollsContract = new PollsContract("AS1S3n9oCcsQmzPLKydnqZAFyhCyVhvaThnC11f7xyMzKDEkjkX6");
+const contractAddress = import.meta.env.VITE_POLLS_CONTRACT_ADDRESS || "AS1S3n9oCcsQmzPLKydnqZAFyhCyVhvaThnC11f7xyMzKDEkjkX6";
+export const pollsContract = new PollsContract(contractAddress);

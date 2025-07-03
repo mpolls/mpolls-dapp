@@ -35,3 +35,13 @@ We welcome contributions!
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 Happy coding!
+
+## Configuration
+
+To set the polls contract address, create a `.env` file in the project root with the following content:
+
+```
+VITE_POLLS_CONTRACT_ADDRESS=your_contract_address_here
+```
+
+If not set, the app will use the default contract address.
