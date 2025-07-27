@@ -1,3 +1,6 @@
+deweb_cli_config.json
+wallet*.yaml
+
 # Environment variables
 .env
 .env.local
