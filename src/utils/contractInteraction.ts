@@ -24,6 +24,8 @@ export interface ContractPoll {
   votes: number[];
   isActive: boolean;
   createdAt: number;
+  endTime: number;
+  status: 'active' | 'closed' | 'ended';
 }
 
 export class PollsContract {
@@ -261,17 +263,52 @@ export class PollsContract {
           parameter: args.serialize(),
         });
         
-        // Since the current contract implementation doesn't return structured data,
-        // we'll create a poll based on the creation event and some defaults
+        // Try to get poll data from events
+        const events = await provider.getEvents({
+          smartContractAddress: this.contractAddress,
+        });
+        
+        // Look for poll data event
+        const pollDataEvent = events.find(event => 
+          event.data.includes(`Poll data:`) && event.data.includes(pollId)
+        );
+        
+        if (pollDataEvent) {
+          const dataStr = pollDataEvent.data.replace('Poll data: ', '');
+          const parts = dataStr.split('|');
+          
+          if (parts.length >= 9) {
+            const options = parts[3].split('||');
+            const votes = parts[8] ? parts[8].split(',').map(v => parseInt(v) || 0) : new Array(options.length).fill(0);
+            const status = parseInt(parts[7]) as 0 | 1 | 2;
+            
+            return {
+              id: pollId,
+              creator: parts[4],
+              title: parts[1],
+              description: parts[2],
+              options: options,
+              votes: votes,
+              isActive: status === 0, // 0 = ACTIVE
+              createdAt: parseInt(parts[5]) || Date.now(),
+              endTime: parseInt(parts[6]) || Date.now(),
+              status: status === 0 ? 'active' : status === 1 ? 'closed' : 'ended'
+            };
+          }
+        }
+        
+        // Fallback to basic poll info
         return {
           id: pollId,
-          creator: "Unknown", // Would need to parse from event data
+          creator: "Unknown",
           title: `Poll #${pollId}`,
           description: `Blockchain poll created via smart contract`,
-          options: ["Yes", "No"], // Default options for now
-          votes: [0, 0], // Default vote counts
+          options: ["Yes", "No"],
+          votes: [0, 0],
           isActive: true,
-          createdAt: Date.now() // Would parse from event timestamp
+          createdAt: Date.now(),
+          endTime: Date.now() + 86400000,
+          status: 'active' as const
         };
       } catch (readError) {
         // If reading fails, still return basic poll info from events
@@ -283,7 +320,9 @@ export class PollsContract {
           options: ["Yes", "No"],
           votes: [0, 0],
           isActive: true,
-          createdAt: Date.now()
+          createdAt: Date.now(),
+          endTime: Date.now() + 86400000,
+          status: 'active' as const
         };
       }
     } catch (error) {
@@ -441,6 +480,75 @@ export class PollsContract {
     } catch (error) {
       console.error("Error fetching all polls:", error);
       return [];
+    }
+  }
+
+  // Admin function to update a poll (only creator can do this)
+  async updatePoll(pollId: string, newTitle: string, newDescription: string): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("✏️ Updating poll with parameters:", {
+        contractAddress: this.contractAddress,
+        pollId,
+        newTitle,
+        newDescription,
+        walletName: this.getWalletName(),
+        network: "Massa Buildnet"
+      });
+
+      const args = new Args()
+        .addString(pollId)
+        .addString(newTitle)
+        .addString(newDescription);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "updatePoll",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Poll update transaction result:", result);
+      return true;
+    } catch (error) {
+      console.error("Error updating poll:", error);
+      throw new Error(`Failed to update poll: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Admin function to close a poll (only creator can do this)
+  async closePoll(pollId: string): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("🔒 Closing poll with parameters:", {
+        contractAddress: this.contractAddress,
+        pollId,
+        walletName: this.getWalletName(),
+        network: "Massa Buildnet"
+      });
+
+      const args = new Args().addString(pollId);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "closePoll",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Poll close transaction result:", result);
+      return true;
+    } catch (error) {
+      console.error("Error closing poll:", error);
+      throw new Error(`Failed to close poll: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
