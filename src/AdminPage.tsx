@@ -61,7 +61,9 @@ const AdminPage = ({ onBack }: AdminPageProps) => {
           creator: contractPoll.creator,
           rewards: "0 MASSA",
           isActive: contractPoll.isActive,
-          createdAt: contractPoll.createdAt
+          createdAt: contractPoll.createdAt,
+          endTime: contractPoll.endTime,
+          status: contractPoll.status
         };
       });
       

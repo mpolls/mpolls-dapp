@@ -314,7 +314,9 @@ export class PollsContract {
         options: ["Option 1", "Option 2"],
         votes: [0, 0],
         isActive: true,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        endTime: Date.now() + (7 * 24 * 60 * 60 * 1000), // Default 7 days from now
+        status: 'active' as const
       };
     } catch (error) {
       console.error("Error fetching poll:", error);
@@ -397,7 +399,9 @@ export class PollsContract {
         creator,
         votes,
         isActive,
-        createdAt: startTime
+        createdAt: startTime,
+        endTime: endTime,
+        status: isActive ? 'active' as const : 'ended' as const
       };
     } catch (error) {
       console.error('💥 Error parsing poll data:', error);

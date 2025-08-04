@@ -86,7 +86,9 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
           creator: contractPoll.creator,
           rewards: "0 MASSA", // Default for now
           isActive: contractPoll.isActive,
-          createdAt: contractPoll.createdAt
+          createdAt: contractPoll.createdAt,
+          endTime: contractPoll.endTime,
+          status: contractPoll.status
         };
 
         // Log the converted display poll
