@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import CreatePoll from "./CreatePoll";
 import AdminPage from "./AdminPage";
+import Navigation from "./components/Navigation";
 import { pollsContract, ContractPoll } from "./utils/contractInteraction";
 
 // Convert ContractPoll to display format
@@ -12,23 +13,40 @@ interface Poll extends Omit<ContractPoll, 'id' | 'votes'> {
   rewards: string;
 }
 
-const PollsApp = () => {
+type PageType = 'home' | 'polls' | 'create' | 'admin';
+
+interface PollsAppProps {
+  initialView?: PageType;
+  onNavigate?: (page: PageType) => void;
+}
+
+const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }) => {
   const [polls, setPolls] = useState<Poll[]>([]);
   const [isLoadingPolls, setIsLoadingPolls] = useState(true);
   const [pollsError, setPollsError] = useState<string | null>(null);
+  const [currentView, setCurrentView] = useState<PageType>(initialView);
 
   const [selectedPoll, setSelectedPoll] = useState<Poll | null>(null);
   const [votedPolls, setVotedPolls] = useState<Set<number>>(new Set());
-  const [showCreatePoll, setShowCreatePoll] = useState(false);
-  const [showAdminPage, setShowAdminPage] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
   const CONTRACT_CREATOR_ADDRESS = "AU1Pd3bod1Js2xD71GLFd1Q1dA8tnugsHroL54Rn7SzYY5KiozfS";
+
+  const handleNavigation = (page: PageType) => {
+    setCurrentView(page);
+    if (onNavigate) {
+      onNavigate(page);
+    }
+  };
 
   useEffect(() => {
     checkAdminStatus();
     fetchPolls();
   }, []);
+
+  useEffect(() => {
+    setCurrentView(initialView);
+  }, [initialView]);
 
   const fetchPolls = async () => {
     setIsLoadingPolls(true);
@@ -40,11 +58,24 @@ const PollsApp = () => {
       
       console.log(`📊 Retrieved ${contractPolls.length} polls from contract`);
       
+      // Log detailed information about each contract poll
+      contractPolls.forEach((contractPoll, index) => {
+        console.log(`\n📋 Contract Poll ${index + 1} Details:`);
+        console.log(`   ID: ${contractPoll.id}`);
+        console.log(`   Title: "${contractPoll.title}"`);
+        console.log(`   Description: "${contractPoll.description}"`);
+        console.log(`   Options: [${contractPoll.options.map(opt => `"${opt}"`).join(", ")}]`);
+        console.log(`   Creator: ${contractPoll.creator}`);
+        console.log(`   Votes: [${contractPoll.votes.join(", ")}]`);
+        console.log(`   Is Active: ${contractPoll.isActive}`);
+        console.log(`   Created At: ${new Date(contractPoll.createdAt).toLocaleString()}`);
+      });
+      
       // Convert ContractPoll to display Poll format
-      const displayPolls: Poll[] = contractPolls.map(contractPoll => {
+      const displayPolls: Poll[] = contractPolls.map((contractPoll, index) => {
         const totalVotes = contractPoll.votes.reduce((sum, votes) => sum + votes, 0);
         
-        return {
+        const displayPoll = {
           id: parseInt(contractPoll.id),
           title: contractPoll.title,
           description: contractPoll.description,
@@ -57,16 +88,36 @@ const PollsApp = () => {
           isActive: contractPoll.isActive,
           createdAt: contractPoll.createdAt
         };
+
+        // Log the converted display poll
+        console.log(`\n🖥️ Display Poll ${index + 1} (converted):`);
+        console.log(`   ID: ${displayPoll.id}`);
+        console.log(`   Title: "${displayPoll.title}"`);
+        console.log(`   Description: "${displayPoll.description}"`);
+        console.log(`   Options: [${displayPoll.options.map(opt => `"${opt}"`).join(", ")}]`);
+        console.log(`   Total Votes: ${displayPoll.totalVotes}`);
+        console.log(`   Individual Votes: [${displayPoll.votes.join(", ")}]`);
+        console.log(`   Status: ${displayPoll.timeLeft}`);
+        console.log(`   Creator: ${displayPoll.creator}`);
+
+        return displayPoll;
       });
       
       // If no polls from blockchain, show a message
       if (displayPolls.length === 0) {
         console.log("ℹ️ No polls found on blockchain. Showing empty state.");
+      } else {
+        console.log(`\n✅ Successfully processed ${displayPolls.length} polls for display`);
+        console.log(`📋 Poll titles: [${displayPolls.map(p => `"${p.title}"`).join(", ")}]`);
       }
       
       setPolls(displayPolls);
     } catch (error) {
-      console.error("Failed to fetch polls:", error);
+      console.error("❌ Failed to fetch polls:", error);
+      if (error instanceof Error) {
+        console.error("   Error message:", error.message);
+        console.error("   Error stack:", error.stack);
+      }
       setPollsError("Failed to load polls from blockchain. Please try again.");
     } finally {
       setIsLoadingPolls(false);
@@ -106,42 +157,63 @@ const PollsApp = () => {
     return total > 0 ? Math.round((votes / total) * 100) : 0;
   };
 
-  if (showCreatePoll) {
-    return <CreatePoll onBack={() => {
-      setShowCreatePoll(false);
-      // Refresh polls when returning from create poll page
-      fetchPolls();
-    }} />;
+  // Conditional rendering based on current view
+  if (currentView === 'create') {
+    return (
+      <>
+        <Navigation onNavigate={handleNavigation} currentPage={currentView} />
+        <CreatePoll
+          onBack={() => {
+            handleNavigation('polls');
+            fetchPolls();
+          }}
+        />
+      </>
+    );
   }
 
-  if (showAdminPage) {
-    return <AdminPage onBack={() => setShowAdminPage(false)} />;
+  if (currentView === 'admin') {
+    return (
+      <>
+        <Navigation onNavigate={handleNavigation} currentPage={currentView} />
+        <AdminPage
+          onBack={() => handleNavigation('polls')}
+        />
+      </>
+    );
   }
 
   return (
-    <div className="polls-app">
-      <header className="polls-header">
-        <div className="header-content">
-          <div className="header-left">
-            <h1>Massa Polls</h1>
-            <p>Decentralized Polls & Contests</p>
-          </div>
-          
-          {/* Admin Button */}
-          {isAdmin && (
-            <div className="header-right">
-              <button 
-                className="admin-btn"
-                onClick={() => setShowAdminPage(true)}
-                title="Admin Panel - Contract Creator Only"
-              >
-                ⚙️ Admin
-              </button>
+    <>
+      <Navigation onNavigate={handleNavigation} currentPage={currentView} />
+      <div className="polls-app">
+        <header className="polls-header">
+          <div className="header-content">
+            <div className="header-left">
+              <h1>🗳️ Massa Polls</h1>
+              <p>Decentralized voting on the Massa blockchain</p>
             </div>
-          )}
-        </div>
+            <div className="header-right">
+              <a 
+                href="https://explorer.massa.net/mainnet" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="explorer-link"
+              >
+                🔗 Massa Explorer
+              </a>
+              <a 
+                href={`https://explorer.massa.net/mainnet/address/${CONTRACT_CREATOR_ADDRESS}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="explorer-link-small"
+              >
+                🔗
+              </a>
+            </div>
+          </div>
+        </header>
         
-        {/* Contract Information */}
         <div className="contract-info-header">
           <div className="contract-details">
             <span className="contract-label">📍 Contract:</span>
@@ -156,7 +228,6 @@ const PollsApp = () => {
             </a>
           </div>
         </div>
-      </header>
 
       {selectedPoll ? (
         <div className="poll-detail">
@@ -243,7 +314,7 @@ const PollsApp = () => {
             <div className="empty-state">
               <h3>📊 No Polls Found</h3>
               <p>No polls have been created on the blockchain yet. Be the first to create one!</p>
-              <button className="create-first-poll-btn" onClick={() => setShowCreatePoll(true)}>
+              <button className="create-first-poll-btn" onClick={() => handleNavigation('create')}>
                 🚀 Create First Poll
               </button>
             </div>
@@ -293,11 +364,12 @@ const PollsApp = () => {
       )}
 
       <div className="create-poll-section">
-        <button className="create-poll-btn" onClick={() => setShowCreatePoll(true)}>
+        <button className="create-poll-btn" onClick={() => handleNavigation('create')}>
           + Create New Poll
         </button>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

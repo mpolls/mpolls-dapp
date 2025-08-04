@@ -25,6 +25,194 @@ html, body {
   color: white;
 }
 
+/* Header Navigation Styles */
+.header-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: rgba(26, 32, 44, 0.95);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 15px 0;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.nav-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: bold;
+  font-size: 1.2rem;
+  color: white;
+}
+
+.nav-logo-icon {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.nav-brand-name {
+  color: #FFD700;
+  font-weight: bold;
+}
+
+.nav-links {
+  display: flex;
+  gap: 30px;
+  align-items: center;
+}
+
+.nav-link {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 20px;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.nav-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #FFD700;
+  transform: translateY(-1px);
+}
+
+.nav-actions {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.nav-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 25px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.95rem;
+}
+
+.nav-btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.nav-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
+}
+
+.nav-btn.primary {
+  background: linear-gradient(45deg, #FFD700, #FFA500);
+  color: #333;
+}
+
+.nav-btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
+}
+
+/* Adjust hero section to account for fixed nav */
+.hero-section {
+  margin-top: 80px;
+}
+
+/* Bottom Navigation Styles */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 10px 0;
+}
+
+.bottom-nav-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.bottom-nav-item {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  min-width: 60px;
+}
+
+.bottom-nav-item:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+.bottom-nav-item.active {
+  color: #FFD700;
+  background: rgba(255, 215, 0, 0.1);
+}
+
+.bottom-nav-item.active .bottom-nav-icon {
+  transform: scale(1.1);
+}
+
+.bottom-nav-icon {
+  font-size: 1.2rem;
+  transition: transform 0.3s ease;
+}
+
+.bottom-nav-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* Add bottom padding to main content to account for bottom nav */
+.landing-page,
+.polls-app {
+  padding-bottom: 80px;
+}
+
+/* Make nav logo clickable */
+.nav-logo {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.nav-logo:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
 .hero-section {
   padding: 80px 20px;
   text-align: center;
@@ -578,6 +766,28 @@ html, body {
 }
 
 @media (max-width: 768px) {
+  /* Header Navigation Mobile Styles */
+  .nav-container {
+    padding: 0 15px;
+  }
+  
+  .nav-links {
+    display: none; /* Hide navigation links on mobile */
+  }
+  
+  .nav-actions {
+    gap: 10px;
+  }
+  
+  .nav-btn {
+    padding: 8px 15px;
+    font-size: 0.9rem;
+  }
+  
+  .nav-brand-name {
+    font-size: 1rem;
+  }
+  
   .brand-name {
     font-size: 2rem;
   }
