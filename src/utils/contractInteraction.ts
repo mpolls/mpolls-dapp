@@ -24,6 +24,8 @@ export interface ContractPoll {
   votes: number[];
   isActive: boolean;
   createdAt: number;
+  endTime: number;
+  status: 'active' | 'closed' | 'ended';
 }
 
 export class PollsContract {
@@ -253,33 +255,33 @@ export class PollsContract {
       } catch (readError) {
         console.log(`⚠️ ReadSC failed for poll ${pollId}:`, readError);
       }
-      
+
       // Get events from the contract to parse poll data
       const events = await provider.getEvents({
         smartContractAddress: this.contractAddress,
       });
-      
+
       console.log(`📋 Found ${events.length} contract events`);
-      
+
       // Look for poll data events that contain the serialized poll information
-      const pollDataEvents = events.filter(event => 
-        event.data.includes(`Poll ${pollId}:`) || 
+      const pollDataEvents = events.filter(event =>
+        event.data.includes(`Poll ${pollId}:`) ||
         event.data.includes(`Poll data:`) ||
         event.data.match(new RegExp(`^${pollId}\\|`)) // Match serialized format starting with poll ID
       );
-      
+
       console.log(`📊 Found ${pollDataEvents.length} poll data events for poll ${pollId}`);
-      
+
       // If we found poll data events, parse the serialized data
       for (const event of pollDataEvents) {
         try {
           let pollData = event.data;
-          
+
           // Extract data if it's in "Poll X: data" format
           if (pollData.includes("Poll ") && pollData.includes(":")) {
             pollData = pollData.substring(pollData.indexOf(":") + 1).trim();
           }
-          
+
           // Parse the serialized poll data: id|title|description|options|creator|startTime|endTime|status|votes
           const pollInfo = this.parsePollData(pollData);
           if (pollInfo && pollInfo.id === pollId) {
@@ -291,17 +293,17 @@ export class PollsContract {
           continue;
         }
       }
-      
+
       // If no data events found, look for creation events as fallback
-      const pollCreateEvents = events.filter(event => 
+      const pollCreateEvents = events.filter(event =>
         event.data.includes(`Poll created with ID: ${pollId}`)
       );
-      
+
       if (pollCreateEvents.length === 0) {
         console.log(`❌ No events found for poll ${pollId}`);
         return null;
       }
-      
+
       // Return basic poll info from creation event
       console.log(`⚠️ Using fallback data for poll ${pollId} - full data not available`);
       return {
@@ -325,10 +327,10 @@ export class PollsContract {
   private parsePollData(pollDataStr: string): ContractPoll | null {
     try {
       console.log(`🔍 Parsing poll data: "${pollDataStr.substring(0, 150)}${pollDataStr.length > 150 ? '...' : ''}"`);
-      
+
       // Format: id|title|description|option1||option2||option3|creator|startTime|endTime|status|voteCount
       const parts = pollDataStr.split('|');
-      
+
       if (parts.length < 8) {
         console.log(`⚠️ Invalid poll data format: expected 8+ parts, got ${parts.length}`);
         return null;
@@ -361,17 +363,17 @@ export class PollsContract {
       const endTime = parseInt(parts[creatorIndex + 2]);
       const status = parseInt(parts[creatorIndex + 3]);
       const voteCountStr = parts[creatorIndex + 4] || '';
-      
+
       // Parse vote counts (comma-separated)
-      const votes = voteCountStr.length > 0 ? 
-        voteCountStr.split(',').map(v => parseInt(v.trim())).filter(v => !isNaN(v)) : 
+      const votes = voteCountStr.length > 0 ?
+        voteCountStr.split(',').map(v => parseInt(v.trim())).filter(v => !isNaN(v)) :
         new Array(options.length).fill(0);
-      
+
       // Ensure votes array matches options length
       while (votes.length < options.length) {
         votes.push(0);
       }
-      
+
       // Determine if poll is active
       const currentTime = Date.now();
       const isActive = status === 0 && currentTime < endTime;
@@ -569,9 +571,9 @@ export class PollsContract {
             const colonIndex = pollDataStr.indexOf(':');
             pollDataStr = pollDataStr.substring(colonIndex + 1).trim();
           }
-          
+
           console.log(`🔍 Processing poll data: "${pollDataStr.substring(0, 100)}${pollDataStr.length > 100 ? '...' : ''}"`);
-          
+
           const poll = this.parsePollData(pollDataStr);
           if (poll && !processedIds.has(poll.id)) {
             polls.push(poll);
@@ -590,23 +592,23 @@ export class PollsContract {
       console.log(`\n📈 POLL RETRIEVAL SUMMARY:`);
       console.log('═════════════════════════════════════════════════════');
       console.log(`   📊 Total Polls Found: ${polls.length}`);
-      
+
       if (polls.length > 0) {
         const activePolls = polls.filter(p => p.isActive).length;
         const inactivePolls = polls.length - activePolls;
         const totalVotes = polls.reduce((sum, p) => sum + p.votes.reduce((s, v) => s + v, 0), 0);
-        
+
         console.log(`   🟢 Active Polls: ${activePolls}`);
         console.log(`   🔴 Inactive Polls: ${inactivePolls}`);
         console.log(`   🗳️  Total Votes Cast: ${totalVotes}`);
-        
+
         // List poll titles
         console.log(`   📋 Poll Titles: [${polls.map(p => `"${p.title}"`).join(', ')}]`);
       }
-      
+
       console.log('═════════════════════════════════════════════════════');
       console.log('✅ Poll retrieval completed successfully!');
-      
+
       return polls;
     } catch (error) {
       console.error('💥 Failed to retrieve polls:', error);
@@ -616,6 +618,75 @@ export class PollsContract {
       console.log('3. Ensure network connectivity to buildnet');
       console.log('4. Check if there are any polls created in the contract');
       return [];
+    }
+  }
+
+  // Admin function to update a poll (only creator can do this)
+  async updatePoll(pollId: string, newTitle: string, newDescription: string): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("✏️ Updating poll with parameters:", {
+        contractAddress: this.contractAddress,
+        pollId,
+        newTitle,
+        newDescription,
+        walletName: this.getWalletName(),
+        network: "Massa Buildnet"
+      });
+
+      const args = new Args()
+        .addString(pollId)
+        .addString(newTitle)
+        .addString(newDescription);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "updatePoll",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Poll update transaction result:", result);
+      return true;
+    } catch (error) {
+      console.error("Error updating poll:", error);
+      throw new Error(`Failed to update poll: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Admin function to close a poll (only creator can do this)
+  async closePoll(pollId: string): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("🔒 Closing poll with parameters:", {
+        contractAddress: this.contractAddress,
+        pollId,
+        walletName: this.getWalletName(),
+        network: "Massa Buildnet"
+      });
+
+      const args = new Args().addString(pollId);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "closePoll",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Poll close transaction result:", result);
+      return true;
+    } catch (error) {
+      console.error("Error closing poll:", error);
+      throw new Error(`Failed to close poll: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
