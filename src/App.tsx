@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
 import { MassaLogo } from "@massalabs/react-ui-kit";
 import PollsApp from './PollsApp';
+import Navigation from './components/Navigation';
+import { pollsContract, ContractPoll } from './utils/contractInteraction';
 import './App.css';
+
+type PageType = 'home' | 'polls' | 'create' | 'admin';
 
 function App() {
   const [currentText, setCurrentText] = useState(0);
-  const [showPolls, setShowPolls] = useState(false);
+  const [currentPage, setCurrentPage] = useState<PageType>('home');
   const [email, setEmail] = useState('');
+  const [featuredPolls, setFeaturedPolls] = useState<ContractPoll[]>([]);
+  const [isLoadingPolls, setIsLoadingPolls] = useState(true);
 
   const dynamicTexts = ['business', 'surveys', 'art contests', 'debates'];
 
@@ -17,25 +23,64 @@ function App() {
     return () => clearInterval(interval);
   }, [dynamicTexts.length]);
 
-  const featuredPolls = [
-    { id: 1, title: 'Best Logo Design Contest', votes: 1247, timeLeft: '2 days' },
-    { id: 2, title: 'Customer Service Survey', votes: 843, timeLeft: '5 days' },
-    { id: 3, title: 'NFT Art Competition', votes: 2156, timeLeft: '1 day' },
-    { id: 4, title: 'Product Feature Poll', votes: 567, timeLeft: '3 days' },
-    { id: 5, title: 'Community Event Ideas', votes: 1089, timeLeft: '1 week' },
-    { id: 6, title: 'Brand Name Vote', votes: 734, timeLeft: '4 days' },
-    { id: 7, title: 'Music Contest Finals', votes: 1892, timeLeft: '6 hours' },
-    { id: 8, title: 'Policy Feedback Survey', votes: 456, timeLeft: '2 weeks' }
-  ];
+  // Fetch featured polls from contract
+  useEffect(() => {
+    const fetchFeaturedPolls = async () => {
+      setIsLoadingPolls(true);
+      try {
+        console.log('🏠 App.tsx: Fetching featured polls from contract...');
+        const contractPolls = await pollsContract.getAllPolls();
+        
+        // Take the first 8 polls for featured section (or all if less than 8)
+        const featured = contractPolls.slice(0, 8);
+        setFeaturedPolls(featured);
+        
+        console.log(`🏠 App.tsx: Successfully loaded ${featured.length} featured polls`);
+      } catch (error) {
+        console.error('🏠 App.tsx: Failed to fetch featured polls:', error);
+        setFeaturedPolls([]);
+      } finally {
+        setIsLoadingPolls(false);
+      }
+    };
+
+    fetchFeaturedPolls();
+  }, []);
 
   const companies = ['TechCorp', 'InnovateCo', 'StartupX', 'BigBrand', 'CreativeStudio'];
 
-  if (showPolls) {
-    return <PollsApp />;
+  const handleNavigation = (page: PageType) => {
+    setCurrentPage(page);
+  };
+
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  // Render different pages based on current page
+  if (currentPage === 'polls' || currentPage === 'create' || currentPage === 'admin') {
+    return (
+      <>
+        <Navigation 
+          onNavigate={handleNavigation} 
+          currentPage={currentPage} 
+        />
+        <PollsApp initialView={currentPage} onNavigate={handleNavigation} />
+      </>
+    );
   }
 
   return (
     <div className="landing-page">
+      <Navigation 
+        onNavigate={handleNavigation} 
+        currentPage={currentPage} 
+        onScrollToSection={scrollToSection}
+      />
+
       <header className="hero-section">
         <div className="hero-content">
           <div className="logo-container">
@@ -49,20 +94,44 @@ function App() {
         </div>
       </header>
 
-      <section className="featured-polls">
+      <section id="featured-polls" className="featured-polls">
         <h2>Featured Polls</h2>
-        <div className="polls-grid">
-          {featuredPolls.map(poll => (
-            <div key={poll.id} className="poll-card">
-              <h3>{poll.title}</h3>
-              <div className="poll-stats">
-                <span className="votes">{poll.votes} votes</span>
-                <span className="time-left">{poll.timeLeft} left</span>
-              </div>
-            </div>
-          ))}
-        </div>
-        <button className="view-all-btn" onClick={() => setShowPolls(true)}>
+        {isLoadingPolls ? (
+          <div className="loading-state">
+            <p>🔄 Loading polls from blockchain...</p>
+          </div>
+        ) : featuredPolls.length === 0 ? (
+          <div className="empty-state">
+            <p>📊 No polls found on the blockchain yet.</p>
+            <button className="create-poll-btn" onClick={() => handleNavigation('create')}>
+              Create First Poll
+            </button>
+          </div>
+        ) : (
+          <div className="polls-grid">
+            {featuredPolls.map(poll => {
+              const totalVotes = poll.votes.reduce((sum, votes) => sum + votes, 0);
+              const timeLeft = poll.isActive ? 'Active' : 'Ended';
+              
+              return (
+                <div key={poll.id} className="poll-card">
+                  <h3>{poll.title}</h3>
+                  <div className="poll-stats">
+                    <span className="votes">{totalVotes} votes</span>
+                    <span className="time-left">{timeLeft}</span>
+                  </div>
+                  <div className="poll-description">
+                    {poll.description.length > 60 
+                      ? `${poll.description.substring(0, 60)}...` 
+                      : poll.description
+                    }
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <button className="view-all-btn" onClick={() => handleNavigation('polls')}>
           View All Polls
         </button>
       </section>
@@ -78,7 +147,7 @@ function App() {
         </div>
       </section>
 
-      <section className="why-create">
+      <section id="why-create" className="why-create">
         <h2>Why Create Polls with Massa Polls?</h2>
         <div className="benefits">
           <div className="benefit">
@@ -115,7 +184,7 @@ function App() {
         </div>
       </section>
 
-      <section className="how-it-works">
+      <section id="how-it-works" className="how-it-works">
         <h2>How It Works</h2>
         <div className="process">
           <h3>To create a contest:</h3>
@@ -129,7 +198,7 @@ function App() {
           </ul>
         </div>
         
-        <button className="final-cta-btn" onClick={() => setShowPolls(true)}>
+        <button className="final-cta-btn" onClick={() => handleNavigation('polls')}>
           View Polls
         </button>
       </section>

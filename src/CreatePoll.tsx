@@ -130,7 +130,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
       // Call the contract to create the poll
       const pollId = await pollsContract.createPoll(pollParams);
 
-      setSuccess(`Poll created successfully! Poll ID: ${pollId}. It will appear in the polls list once confirmed on the blockchain.`);
+      setSuccess(`Poll created successfully! Poll ID: ${pollId}. Redirecting to polls list...`);
       
       // Reset form
       setFormData({
@@ -145,6 +145,11 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
         contestType: "open",
         viewType: "text"
       });
+
+      // Redirect to polls list after a short delay to show the success message
+      setTimeout(() => {
+        onBack(); // This will navigate back to the polls list
+      }, 2000); // 2 second delay
 
     } catch (err) {
       console.error("Error creating poll:", err);

@@ -238,21 +238,9 @@ export class PollsContract {
       const { JsonRpcProvider } = await import("@massalabs/massa-web3");
       const provider = JsonRpcProvider.buildnet();
       
-      // Get all events from the contract to parse poll data
-      const events = await provider.getEvents({
-        smartContractAddress: this.contractAddress,
-      });
+      console.log(`📊 Fetching poll ${pollId} from contract...`);
       
-      // Look for poll creation events for this specific poll ID
-      const pollCreateEvents = events.filter(event => 
-        event.data.includes(`Poll created with ID: ${pollId}`)
-      );
-      
-      if (pollCreateEvents.length === 0) {
-        return null;
-      }
-      
-      // Try to read poll data from storage using readSC
+      // Try to read poll data directly first
       try {
         const args = new Args().addString(pollId);
         await provider.readSC({
@@ -261,33 +249,156 @@ export class PollsContract {
           parameter: args.serialize(),
         });
         
-        // Since the current contract implementation doesn't return structured data,
-        // we'll create a poll based on the creation event and some defaults
-        return {
-          id: pollId,
-          creator: "Unknown", // Would need to parse from event data
-          title: `Poll #${pollId}`,
-          description: `Blockchain poll created via smart contract`,
-          options: ["Yes", "No"], // Default options for now
-          votes: [0, 0], // Default vote counts
-          isActive: true,
-          createdAt: Date.now() // Would parse from event timestamp
-        };
+        console.log(`📋 Called getPoll for poll ${pollId}, checking events...`);
       } catch (readError) {
-        // If reading fails, still return basic poll info from events
-        return {
-          id: pollId,
-          creator: "Unknown",
-          title: `Poll #${pollId}`,
-          description: `Blockchain poll created via smart contract`,
-          options: ["Yes", "No"],
-          votes: [0, 0],
-          isActive: true,
-          createdAt: Date.now()
-        };
+        console.log(`⚠️ ReadSC failed for poll ${pollId}:`, readError);
       }
+      
+      // Get events from the contract to parse poll data
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+      
+      console.log(`📋 Found ${events.length} contract events`);
+      
+      // Look for poll data events that contain the serialized poll information
+      const pollDataEvents = events.filter(event => 
+        event.data.includes(`Poll ${pollId}:`) || 
+        event.data.includes(`Poll data:`) ||
+        event.data.match(new RegExp(`^${pollId}\\|`)) // Match serialized format starting with poll ID
+      );
+      
+      console.log(`📊 Found ${pollDataEvents.length} poll data events for poll ${pollId}`);
+      
+      // If we found poll data events, parse the serialized data
+      for (const event of pollDataEvents) {
+        try {
+          let pollData = event.data;
+          
+          // Extract data if it's in "Poll X: data" format
+          if (pollData.includes("Poll ") && pollData.includes(":")) {
+            pollData = pollData.substring(pollData.indexOf(":") + 1).trim();
+          }
+          
+          // Parse the serialized poll data: id|title|description|options|creator|startTime|endTime|status|votes
+          const pollInfo = this.parsePollData(pollData);
+          if (pollInfo && pollInfo.id === pollId) {
+            console.log(`✅ Successfully parsed poll data for poll ${pollId}`);
+            return pollInfo;
+          }
+        } catch (parseError) {
+          console.log(`⚠️ Failed to parse event data:`, parseError);
+          continue;
+        }
+      }
+      
+      // If no data events found, look for creation events as fallback
+      const pollCreateEvents = events.filter(event => 
+        event.data.includes(`Poll created with ID: ${pollId}`)
+      );
+      
+      if (pollCreateEvents.length === 0) {
+        console.log(`❌ No events found for poll ${pollId}`);
+        return null;
+      }
+      
+      // Return basic poll info from creation event
+      console.log(`⚠️ Using fallback data for poll ${pollId} - full data not available`);
+      return {
+        id: pollId,
+        creator: "Unknown",
+        title: `Poll #${pollId}`,
+        description: `Poll created on blockchain`,
+        options: ["Option 1", "Option 2"],
+        votes: [0, 0],
+        isActive: true,
+        createdAt: Date.now()
+      };
     } catch (error) {
       console.error("Error fetching poll:", error);
+      return null;
+    }
+  }
+
+  // Helper method to parse serialized poll data from contract events
+  // Uses the same parsing logic as list-all-polls.js from the contract project
+  private parsePollData(pollDataStr: string): ContractPoll | null {
+    try {
+      console.log(`🔍 Parsing poll data: "${pollDataStr.substring(0, 150)}${pollDataStr.length > 150 ? '...' : ''}"`);
+      
+      // Format: id|title|description|option1||option2||option3|creator|startTime|endTime|status|voteCount
+      const parts = pollDataStr.split('|');
+      
+      if (parts.length < 8) {
+        console.log(`⚠️ Invalid poll data format: expected 8+ parts, got ${parts.length}`);
+        return null;
+      }
+
+      // Find where the options end by looking for the creator (address starting with AU)
+      let creatorIndex = -1;
+      for (let i = 3; i < parts.length; i++) {
+        if (parts[i].startsWith('AU') && parts[i].length > 20) {
+          creatorIndex = i;
+          break;
+        }
+      }
+
+      if (creatorIndex === -1) {
+        console.log(`⚠️ Could not find creator address in poll data`);
+        return null;
+      }
+
+      // Reconstruct options by joining parts between index 3 and creator
+      const optionsParts = parts.slice(3, creatorIndex);
+      const optionsString = optionsParts.join('|');
+      const options = optionsString.split('||').filter(opt => opt.length > 0);
+
+      const id = parts[0];
+      const title = parts[1];
+      const description = parts[2];
+      const creator = parts[creatorIndex];
+      const startTime = parseInt(parts[creatorIndex + 1]);
+      const endTime = parseInt(parts[creatorIndex + 2]);
+      const status = parseInt(parts[creatorIndex + 3]);
+      const voteCountStr = parts[creatorIndex + 4] || '';
+      
+      // Parse vote counts (comma-separated)
+      const votes = voteCountStr.length > 0 ? 
+        voteCountStr.split(',').map(v => parseInt(v.trim())).filter(v => !isNaN(v)) : 
+        new Array(options.length).fill(0);
+      
+      // Ensure votes array matches options length
+      while (votes.length < options.length) {
+        votes.push(0);
+      }
+      
+      // Determine if poll is active
+      const currentTime = Date.now();
+      const isActive = status === 0 && currentTime < endTime;
+
+      console.log(`📊 Successfully parsed poll:`);
+      console.log(`   ID: ${id}`);
+      console.log(`   Title: "${title}"`);
+      console.log(`   Description: "${description}"`);
+      console.log(`   Options: [${options.map(opt => `"${opt}"`).join(', ')}]`);
+      console.log(`   Creator: ${creator}`);
+      console.log(`   Start Time: ${new Date(startTime).toLocaleString()}`);
+      console.log(`   End Time: ${new Date(endTime).toLocaleString()}`);
+      console.log(`   Status: ${status} (${isActive ? 'Active' : 'Inactive'})`);
+      console.log(`   Votes: [${votes.join(', ')}]`);
+
+      return {
+        id,
+        title,
+        description,
+        options,
+        creator,
+        votes,
+        isActive,
+        createdAt: startTime
+      };
+    } catch (error) {
+      console.error('💥 Error parsing poll data:', error);
       return null;
     }
   }
@@ -400,46 +511,110 @@ export class PollsContract {
 
   // Utility method to get all polls (for listing)
   async getAllPolls(): Promise<ContractPoll[]> {
+    console.log('📋 Listing All Polls in Contract');
+    console.log('═════════════════════════════════════════════════════');
+    console.log(`📍 Contract Address: ${this.contractAddress}`);
+    console.log(`🌐 Network: Massa Buildnet`);
+    console.log(`🔗 Explorer: https://buildnet-explorer.massa.net/address/${this.contractAddress}`);
+    console.log('═════════════════════════════════════════════════════');
+
     try {
       const { JsonRpcProvider } = await import("@massalabs/massa-web3");
       const provider = JsonRpcProvider.buildnet();
       
-      console.log("🔍 Fetching all polls from blockchain...");
+      // Call getAllPolls function to trigger events (using readSC for compatibility)
+      console.log('\n📊 Fetching all polls from contract...');
       
+      try {
+        await provider.readSC({
+          target: this.contractAddress,
+          func: 'getAllPolls',
+          parameter: new Args().serialize(),
+        });
+        console.log('✅ Successfully called getAllPolls function');
+      } catch (readError) {
+        console.log('⚠️ ReadSC getAllPolls call failed, continuing with event retrieval:', readError);
+      }
+
+      // Wait for events to be generated
+      console.log('⏳ Waiting for contract events...');
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
       // Get all events from the contract
       const events = await provider.getEvents({
         smartContractAddress: this.contractAddress,
       });
-      
-      console.log(`📋 Found ${events.length} contract events`);
-      
-      // Filter for poll creation events
-      const pollCreateEvents = events.filter(event => 
-        event.data.includes("Poll created with ID:")
-      );
-      
-      console.log(`🗳️ Found ${pollCreateEvents.length} poll creation events`);
-      
+
+      console.log(`📋 Retrieved ${events.length} events from contract`);
+
+      // Filter for poll data events
+      const pollEvents = events.filter(event => {
+        const data = event.data;
+        // Look for events that contain poll data (either direct serialized data or "Poll X: data" format)
+        return data.includes('|') && (data.match(/^\d+\|/) || data.includes('Poll ') && data.includes(':'));
+      });
+
+      console.log(`🗳️ Found ${pollEvents.length} poll events`);
+
       const polls: ContractPoll[] = [];
-      
-      // Extract poll IDs from creation events
-      for (const event of pollCreateEvents) {
-        const match = event.data.match(/Poll created with ID: (\d+)/);
-        if (match) {
-          const pollId = match[1];
-          console.log(`📊 Processing poll ID: ${pollId}`);
+      const processedIds = new Set<string>();
+
+      // Process each poll event
+      for (const event of pollEvents) {
+        try {
+          let pollDataStr = event.data;
           
-          const poll = await this.getPoll(pollId);
-          if (poll) {
-            polls.push(poll);
+          // Extract data if it's in "Poll X: data" format
+          if (pollDataStr.includes('Poll ') && pollDataStr.includes(':')) {
+            const colonIndex = pollDataStr.indexOf(':');
+            pollDataStr = pollDataStr.substring(colonIndex + 1).trim();
           }
+          
+          console.log(`🔍 Processing poll data: "${pollDataStr.substring(0, 100)}${pollDataStr.length > 100 ? '...' : ''}"`);
+          
+          const poll = this.parsePollData(pollDataStr);
+          if (poll && !processedIds.has(poll.id)) {
+            polls.push(poll);
+            processedIds.add(poll.id);
+            console.log(`✅ Successfully parsed poll #${poll.id}: "${poll.title}"`);
+          }
+        } catch (parseError) {
+          console.log(`⚠️ Failed to parse poll event:`, parseError);
+          continue;
         }
       }
+
+      // Sort polls by ID (newest first)
+      polls.sort((a, b) => parseInt(b.id) - parseInt(a.id));
+
+      console.log(`\n📈 POLL RETRIEVAL SUMMARY:`);
+      console.log('═════════════════════════════════════════════════════');
+      console.log(`   📊 Total Polls Found: ${polls.length}`);
       
-      console.log(`✅ Successfully fetched ${polls.length} polls from blockchain`);
+      if (polls.length > 0) {
+        const activePolls = polls.filter(p => p.isActive).length;
+        const inactivePolls = polls.length - activePolls;
+        const totalVotes = polls.reduce((sum, p) => sum + p.votes.reduce((s, v) => s + v, 0), 0);
+        
+        console.log(`   🟢 Active Polls: ${activePolls}`);
+        console.log(`   🔴 Inactive Polls: ${inactivePolls}`);
+        console.log(`   🗳️  Total Votes Cast: ${totalVotes}`);
+        
+        // List poll titles
+        console.log(`   📋 Poll Titles: [${polls.map(p => `"${p.title}"`).join(', ')}]`);
+      }
+      
+      console.log('═════════════════════════════════════════════════════');
+      console.log('✅ Poll retrieval completed successfully!');
+      
       return polls;
     } catch (error) {
-      console.error("Error fetching all polls:", error);
+      console.error('💥 Failed to retrieve polls:', error);
+      console.log('\n🔧 Troubleshooting Steps:');
+      console.log('1. Check if the contract is properly deployed');
+      console.log('2. Verify the contract address is correct');
+      console.log('3. Ensure network connectivity to buildnet');
+      console.log('4. Check if there are any polls created in the contract');
       return [];
     }
   }

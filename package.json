@@ -10,7 +10,12 @@
     "build:env": "VITE_USER_NODE_ENV=build tsc --project tsconfig.build.json && vite build --mode build",
     "dev:demo": "vite --mode demo",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:contract-flow": "node test/test-contract-data-flow.js",
+    "test:debug-retrieval": "node test/debug-frontend-retrieval.js",
+    "test:simple": "node test/simple-diagnostic.js",
+    "test:submit-retrieve": "node test/test-submit-vs-retrieve.js",
+    "test:all": "npm run test:contract-flow && npm run test:debug-retrieval"
   },
   "dependencies": {
     "@massalabs/massa-web3": "^5.2.0",
