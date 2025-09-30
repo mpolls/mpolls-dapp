@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import CreateProject from "./CreateProject";
+import { pollsContract } from "./utils/contractInteraction";
+import { logError } from "./utils/errorHandling";
 import FolderIcon from '@mui/icons-material/Folder';
 import AddIcon from '@mui/icons-material/Add';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -9,6 +11,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
+import ErrorIcon from '@mui/icons-material/Error';
 
 interface Project {
   id: number;
@@ -27,6 +30,7 @@ interface ProjectsPageProps {
 const ProjectsPage = ({ onBack }: ProjectsPageProps) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -37,44 +41,47 @@ const ProjectsPage = ({ onBack }: ProjectsPageProps) => {
 
   const fetchProjects = async () => {
     setIsLoadingProjects(true);
+    setProjectsError(null);
+
     try {
-      // TODO: Implement actual blockchain fetch
-      // Simulating with dummy data for now
-      setTimeout(() => {
-        const dummyProjects: Project[] = [
-          {
-            id: 1,
-            name: "Community Governance",
-            description: "Polls and surveys for community decision making",
-            creator: "AU1Pd3bod1Js2xD71GLFd1Q1dA8tnugsHroL54Rn7SzYY5KiozfS",
-            createdAt: Date.now() - 30 * 24 * 60 * 60 * 1000,
-            pollCount: 12,
-            status: 'active'
-          },
-          {
-            id: 2,
-            name: "Product Feedback",
-            description: "Customer feedback and feature requests",
-            creator: "AU1Pd3bod1Js2xD71GLFd1Q1dA8tnugsHroL54Rn7SzYY5KiozfS",
-            createdAt: Date.now() - 15 * 24 * 60 * 60 * 1000,
-            pollCount: 8,
-            status: 'active'
-          },
-          {
-            id: 3,
-            name: "Team Surveys",
-            description: "Internal team feedback and pulse checks",
-            creator: "AU1Pd3bod1Js2xD71GLFd1Q1dA8tnugsHroL54Rn7SzYY5KiozfS",
-            createdAt: Date.now() - 60 * 24 * 60 * 60 * 1000,
-            pollCount: 5,
-            status: 'archived'
-          }
-        ];
-        setProjects(dummyProjects);
-        setIsLoadingProjects(false);
-      }, 1000);
+      console.log('🔄 Fetching projects from blockchain...');
+
+      // Fetch projects from blockchain
+      const contractProjects = await pollsContract.getAllProjects();
+
+      console.log(`📊 Retrieved ${contractProjects.length} projects from contract`);
+
+      // Transform ContractProject to Project format
+      const displayProjects: Project[] = contractProjects.map(project => {
+        const projectId = parseInt(project.id);
+        const pollCount = project.pollIds?.length || 0;
+
+        // Determine status based on poll count or creation date
+        // Projects with no polls or very old could be considered archived
+        const daysSinceCreation = (Date.now() - project.createdAt) / (1000 * 60 * 60 * 24);
+        const status: 'active' | 'archived' = daysSinceCreation > 90 && pollCount === 0 ? 'archived' : 'active';
+
+        return {
+          id: projectId,
+          name: project.name,
+          description: project.description,
+          creator: project.creator,
+          createdAt: project.createdAt,
+          pollCount: pollCount,
+          status: status
+        };
+      });
+
+      console.log(`✅ Successfully processed ${displayProjects.length} projects for display`);
+
+      setProjects(displayProjects);
+      setProjectsError(null);
     } catch (error) {
-      console.error("Error fetching projects:", error);
+      console.error("❌ Error fetching projects:", error);
+      logError(error, { action: 'fetching projects' });
+      setProjectsError("Failed to load projects from blockchain. Please try again.");
+      setProjects([]);
+    } finally {
       setIsLoadingProjects(false);
     }
   };
@@ -121,6 +128,14 @@ const ProjectsPage = ({ onBack }: ProjectsPageProps) => {
             <div className="loading-state">
               <h3><RefreshIcon sx={{ fontSize: 24, marginRight: 1, verticalAlign: 'middle' }} /> Loading Projects...</h3>
               <p>Fetching your projects from the blockchain.</p>
+            </div>
+          ) : projectsError ? (
+            <div className="error-state">
+              <h3><ErrorIcon sx={{ fontSize: 24, marginRight: 1, verticalAlign: 'middle' }} /> Error Loading Projects</h3>
+              <p>{projectsError}</p>
+              <button className="retry-btn" onClick={fetchProjects}>
+                <RefreshIcon sx={{ fontSize: 18, marginRight: 0.5, verticalAlign: 'middle' }} /> Retry
+              </button>
             </div>
           ) : projects.length === 0 ? (
             <div className="empty-state">

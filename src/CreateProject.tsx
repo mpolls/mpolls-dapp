@@ -98,13 +98,17 @@ const CreateProject = ({ onBack, onProjectCreated }: CreateProjectProps) => {
     setSuccess("");
 
     try {
-      // TODO: Implement actual blockchain integration
-      console.log("Creating project:", formData);
+      console.log("🚀 Creating project on blockchain:", formData);
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Create project on blockchain
+      const projectId = await pollsContract.createProject({
+        name: formData.name,
+        description: formData.description
+      });
 
-      setSuccess("Project created successfully! Redirecting...");
+      console.log(`✅ Project created successfully with ID: ${projectId}`);
+
+      setSuccess(`Project created successfully! Project ID: ${projectId}. Redirecting...`);
 
       // Reset form
       setFormData({
@@ -114,14 +118,16 @@ const CreateProject = ({ onBack, onProjectCreated }: CreateProjectProps) => {
         visibility: "public"
       });
 
-      // Redirect after success
+      // Redirect after success to see the new project
       setTimeout(() => {
         onProjectCreated();
-      }, 1500);
+      }, 2000);
 
     } catch (err) {
-      console.error("Error creating project:", err);
-      setError("Failed to create project. Please try again.");
+      console.error("❌ Error creating project:", err);
+      logError(err, { action: 'creating project' });
+      const friendlyError = parseBlockchainError(err, { action: 'creating project' });
+      setError(`${friendlyError.message} ${friendlyError.suggestion}`);
     } finally {
       setIsCreating(false);
     }
