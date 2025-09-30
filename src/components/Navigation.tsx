@@ -4,10 +4,11 @@ import HomeIcon from '@mui/icons-material/Home';
 import PollIcon from '@mui/icons-material/Poll';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import SettingsIcon from '@mui/icons-material/Settings';
+import FolderIcon from '@mui/icons-material/Folder';
 
 interface NavigationProps {
-  onNavigate: (page: 'home' | 'polls' | 'create' | 'admin') => void;
-  currentPage: 'home' | 'polls' | 'create' | 'admin';
+  onNavigate: (page: 'home' | 'polls' | 'create' | 'admin' | 'projects') => void;
+  currentPage: 'home' | 'polls' | 'create' | 'admin' | 'projects';
   onScrollToSection?: (sectionId: string) => void;
 }
 
@@ -83,6 +84,16 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, currentPage, onScro
               <PollIcon sx={{ fontSize: 24 }} />
             </div>
             <span className="bottom-nav-label">Polls</span>
+          </button>
+
+          <button
+            className={`bottom-nav-item ${currentPage === 'projects' ? 'active' : ''}`}
+            onClick={() => onNavigate('projects')}
+          >
+            <div className="bottom-nav-icon">
+              <FolderIcon sx={{ fontSize: 24 }} />
+            </div>
+            <span className="bottom-nav-label">Projects</span>
           </button>
 
           <button
