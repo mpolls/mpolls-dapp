@@ -7,6 +7,8 @@ import { ToastProvider } from './components/ToastContainer';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import CreateIcon from '@mui/icons-material/Create';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import TableChartIcon from '@mui/icons-material/TableChart';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import './App.css';
 
 type PageType = 'home' | 'polls' | 'create' | 'admin';
@@ -138,11 +140,11 @@ function App() {
         <h2>Featured Polls</h2>
         {isLoadingPolls ? (
           <div className="loading-state">
-            <p>🔄 Loading polls from blockchain...</p>
+            <p><RefreshIcon sx={{ fontSize: 20, marginRight: 0.5, verticalAlign: 'middle' }} /> Loading polls from blockchain...</p>
           </div>
         ) : featuredPolls.length === 0 ? (
           <div className="empty-state">
-            <p>📊 No polls found on the blockchain yet.</p>
+            <p><TableChartIcon sx={{ fontSize: 20, marginRight: 0.5, verticalAlign: 'middle' }} /> No polls found on the blockchain yet.</p>
             <button className="create-poll-btn" onClick={() => handleNavigation('create')}>
               Create First Poll
             </button>

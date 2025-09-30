@@ -6,6 +6,19 @@ import { pollsContract, ContractPoll } from "./utils/contractInteraction";
 import { parseBlockchainError, logError } from "./utils/errorHandling";
 import { useToast } from "./components/ToastContainer";
 import { formatTimeRemaining, getTimeUrgencyClass } from "./utils/timeFormat";
+import HowToVoteIcon from '@mui/icons-material/HowToVote';
+import TableChartIcon from '@mui/icons-material/TableChart';
+import ViewModuleIcon from '@mui/icons-material/ViewModule';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import LinkIcon from '@mui/icons-material/Link';
+import PlaceIcon from '@mui/icons-material/Place';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import PeopleIcon from '@mui/icons-material/People';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import ErrorIcon from '@mui/icons-material/Error';
 
 // Convert ContractPoll to display format
 interface Poll extends Omit<ContractPoll, 'id' | 'votes'> {
@@ -415,7 +428,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
         <header className="polls-header">
           <div className="header-content">
             <div className="header-left">
-              <h1>🗳️ Massa Polls</h1>
+              <h1><HowToVoteIcon sx={{ fontSize: 32, marginRight: 1, verticalAlign: 'middle' }} /> Massa Polls</h1>
               <p>Decentralized voting on the Massa blockchain</p>
             </div>
             <div className="header-right">
@@ -423,7 +436,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
               <div className="wallet-section">
                 {isWalletConnected ? (
                   <div className="wallet-connected">
-                    <span className="wallet-status">✅ Wallet Connected</span>
+                    <span className="wallet-status"><CheckCircleIcon sx={{ fontSize: 18, marginRight: 0.5, verticalAlign: 'middle' }} /> Wallet Connected</span>
                     {walletAddress && (
                       <span className="wallet-address">
                         {walletAddress.length > 20 ? 
@@ -439,7 +452,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                     onClick={connectWallet}
                     disabled={isConnectingWallet}
                   >
-                    {isConnectingWallet ? '🔄 Connecting...' : '🔗 Connect Wallet'}
+                    {isConnectingWallet ? <><RefreshIcon sx={{ fontSize: 18, marginRight: 0.5, verticalAlign: 'middle' }} /> Connecting...</> : <><LinkIcon sx={{ fontSize: 18, marginRight: 0.5, verticalAlign: 'middle' }} /> Connect Wallet</>}
                   </button>
                 )}
               </div>
@@ -449,15 +462,15 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                 rel="noopener noreferrer"
                 className="explorer-link"
               >
-                🔗 Massa Explorer
+                <LinkIcon sx={{ fontSize: 16, marginRight: 0.5, verticalAlign: 'middle' }} /> Massa Explorer
               </a>
-              <a 
+              <a
                 href={`https://explorer.massa.net/mainnet/address/${CONTRACT_CREATOR_ADDRESS}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="explorer-link-small"
               >
-                🔗
+                <LinkIcon sx={{ fontSize: 16 }} />
               </a>
             </div>
           </div>
@@ -465,7 +478,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
         
         <div className="contract-info-header">
           <div className="contract-details">
-            <span className="contract-label">📍 Contract:</span>
+            <span className="contract-label"><PlaceIcon sx={{ fontSize: 16, marginRight: 0.5, verticalAlign: 'middle' }} /> Contract:</span>
             <span className="contract-address">{pollsContract.getContractAddress()}</span>
             <a 
               href={pollsContract.getExplorerUrl()}
@@ -473,14 +486,14 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
               rel="noopener noreferrer"
               className="explorer-link-small"
             >
-              🔗
+              <LinkIcon sx={{ fontSize: 16 }} />
             </a>
           </div>
         </div>
 
       {selectedPoll ? (
         <div className="poll-detail">
-          <button 
+          <button
             className="back-btn"
             onClick={() => setSelectedPoll(null)}
           >
@@ -503,7 +516,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
               {/* Voting Status Messages */}
               {votingStatus.message && (
                 <div className={`voting-feedback voting-${votingStatus.type}`}>
-                  {votingStatus.isVoting && <span className="voting-spinner">🔄 </span>}
+                  {votingStatus.isVoting && <span className="voting-spinner"><RefreshIcon sx={{ fontSize: 16, marginRight: 0.5, verticalAlign: 'middle' }} /> </span>}
                   {votingStatus.message}
                 </div>
               )}
@@ -551,7 +564,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
           {/* Loading State */}
           {isLoadingPolls && (
             <div className="loading-state">
-              <h3>🔄 Loading Polls from Blockchain...</h3>
+              <h3><RefreshIcon sx={{ fontSize: 24, marginRight: 1, verticalAlign: 'middle' }} /> Loading Polls from Blockchain...</h3>
               <p>Fetching the latest polls from the Massa network. This may take a moment.</p>
             </div>
           )}
@@ -559,10 +572,10 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
           {/* Error State */}
           {pollsError && !isLoadingPolls && (
             <div className="error-state">
-              <h3>❌ Error Loading Polls</h3>
+              <h3><ErrorIcon sx={{ fontSize: 24, marginRight: 1, verticalAlign: 'middle' }} /> Error Loading Polls</h3>
               <p>{pollsError}</p>
               <button className="retry-btn" onClick={fetchPolls}>
-                🔄 Retry
+                <RefreshIcon sx={{ fontSize: 18, marginRight: 0.5, verticalAlign: 'middle' }} /> Retry
               </button>
             </div>
           )}
@@ -570,10 +583,10 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
           {/* Empty State */}
           {!isLoadingPolls && !pollsError && polls.length === 0 && (
             <div className="empty-state">
-              <h3>📊 No Polls Found</h3>
+              <h3><TableChartIcon sx={{ fontSize: 24, marginRight: 1, verticalAlign: 'middle' }} /> No Polls Found</h3>
               <p>No polls have been created on the blockchain yet. Be the first to create one!</p>
               <button className="create-first-poll-btn" onClick={() => handleNavigation('create')}>
-                🚀 Create First Poll
+                <RocketLaunchIcon sx={{ fontSize: 18, marginRight: 0.5, verticalAlign: 'middle' }} /> Create First Poll
               </button>
             </div>
           )}
@@ -583,7 +596,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
             <>
               <div className="polls-header-info">
                 <div className="polls-header-left">
-                  <h3>📊 Blockchain Polls</h3>
+                  <h3><TableChartIcon sx={{ fontSize: 22, marginRight: 1, verticalAlign: 'middle' }} /> Blockchain Polls</h3>
                   <p>Showing {polls.length} poll{polls.length !== 1 ? 's' : ''} from the Massa blockchain</p>
                   {lastRefreshTime && (
                     <small className="last-refresh">
@@ -598,14 +611,14 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                       onClick={() => setViewMode('beta')}
                       title="Table View (Beta)"
                     >
-                      📊 Beta
+                      <TableChartIcon sx={{ fontSize: 18, marginRight: 0.5 }} /> Beta
                     </button>
                     <button
                       className={`view-mode-btn ${viewMode === 'classic' ? 'active' : ''}`}
                       onClick={() => setViewMode('classic')}
                       title="Card View (Classic)"
                     >
-                      🎴 Classic
+                      <ViewModuleIcon sx={{ fontSize: 18, marginRight: 0.5 }} /> Classic
                     </button>
                   </div>
                   <label className="auto-refresh-toggle">
@@ -617,7 +630,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                     <span>Auto-refresh (30s)</span>
                   </label>
                   <button className="refresh-polls-btn" onClick={fetchPolls}>
-                    🔄 Refresh
+                    <RefreshIcon sx={{ fontSize: 18, marginRight: 0.5, verticalAlign: 'middle' }} /> Refresh
                   </button>
                 </div>
               </div>
@@ -646,7 +659,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                           <td className="td-poll">
                             <div className="poll-cell">
                               <div className="poll-icon">
-                                <span>🗳️</span>
+                                <HowToVoteIcon sx={{ fontSize: 24 }} />
                               </div>
                               <div className="poll-info">
                                 <div className="poll-title-row">
@@ -711,14 +724,14 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
 
                       <div className="poll-card-stats">
                         <div className="stat-box">
-                          <span className="stat-icon">👥</span>
+                          <span className="stat-icon"><PeopleIcon sx={{ fontSize: 28 }} /></span>
                           <div className="stat-details">
                             <span className="stat-value">{poll.totalVotes}</span>
                             <span className="stat-label">responses</span>
                           </div>
                         </div>
                         <div className="stat-box">
-                          <span className="stat-icon">📅</span>
+                          <span className="stat-icon"><CalendarTodayIcon sx={{ fontSize: 28 }} /></span>
                           <div className="stat-details">
                             <span className="stat-value">
                               {poll.isActive ? formatTimeRemaining(poll.endTime, poll.isActive) : 'Ended'}
@@ -734,7 +747,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                         <button className="poll-action-btn">
                           {poll.isActive ? 'View Results' : 'Edit & Publish'}
                         </button>
-                        <div className="poll-card-menu">⋮</div>
+                        <div className="poll-card-menu"><MoreVertIcon sx={{ fontSize: 20 }} /></div>
                       </div>
 
                       <div className="poll-card-meta">
