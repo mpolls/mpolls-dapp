@@ -816,6 +816,7 @@ export class PollsContract {
         const { JsonRpcProvider } = await import("@massalabs/massa-web3");
         const provider = JsonRpcProvider.buildnet();
 
+        // Get events from the contract
         const events = await provider.getEvents({
           smartContractAddress: this.contractAddress,
         });
@@ -865,6 +866,7 @@ export class PollsContract {
 
       await new Promise(resolve => setTimeout(resolve, 3000));
 
+      // Get events from the contract
       const events = await provider.getEvents({
         smartContractAddress: this.contractAddress,
       });
