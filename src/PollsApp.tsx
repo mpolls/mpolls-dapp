@@ -603,43 +603,69 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                 </div>
               </div>
               
-              <div className="polls-grid">
-                {polls.map(poll => (
-                  <div key={poll.id} className={`poll-card ${!poll.isActive ? 'poll-inactive' : ''}`} onClick={() => setSelectedPoll(poll)}>
-                    <div className="poll-badge">
-                      <span className="blockchain-badge">⛓️ On-Chain</span>
-                      <span className="poll-id">#{poll.id}</span>
-                      <span className={`poll-status-badge ${poll.isActive ? 'active' : 'inactive'}`}>
-                        {poll.isActive ? '🟢 Active' : '🔴 Ended'}
-                      </span>
-                    </div>
-                    
-                    <h3>{poll.title}</h3>
-                    <p className="poll-description">{poll.description}</p>
-                    
-                    <div className="poll-preview">
-                      <div className="poll-stats">
-                        <span className="votes">{poll.totalVotes} votes</span>
-                        <span className={`time-left ${getTimeUrgencyClass(poll.endTime, poll.isActive)}`}>
-                          {formatTimeRemaining(poll.endTime, poll.isActive)}
-                        </span>
-                      </div>
-                      <div className="poll-rewards">
-                        🏆 {poll.rewards}
-                      </div>
-                    </div>
-                    
-                    <div className="poll-creator">
-                      Created by {poll.creator}
-                    </div>
-                    
-                    {!poll.isActive && (
-                      <div className="poll-inactive-overlay">
-                        <span>Voting Ended</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
+              <div className="polls-table-container">
+                <table className="polls-table">
+                  <thead>
+                    <tr>
+                      <th className="th-poll">POLL</th>
+                      <th className="th-status">STATUS</th>
+                      <th className="th-votes">VOTES</th>
+                      <th className="th-rewards">REWARDS</th>
+                      <th className="th-creator">CREATOR</th>
+                      <th className="th-time">TIME REMAINING</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {polls.map(poll => (
+                      <tr
+                        key={poll.id}
+                        className={`poll-row ${!poll.isActive ? 'poll-inactive' : ''}`}
+                        onClick={() => setSelectedPoll(poll)}
+                      >
+                        <td className="td-poll">
+                          <div className="poll-cell">
+                            <div className="poll-icon">
+                              <span>🗳️</span>
+                            </div>
+                            <div className="poll-info">
+                              <div className="poll-title-row">
+                                <span className="poll-title">{poll.title}</span>
+                                <span className="poll-id">#{poll.id}</span>
+                              </div>
+                              <span className="poll-description">
+                                {poll.description.length > 60
+                                  ? `${poll.description.substring(0, 60)}...`
+                                  : poll.description
+                                }
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="td-status">
+                          <span className={`status-badge ${poll.isActive ? 'active' : 'inactive'}`}>
+                            {poll.isActive ? 'Active' : 'Ended'}
+                          </span>
+                        </td>
+                        <td className="td-votes">
+                          <span className="votes-count">{poll.totalVotes}</span>
+                        </td>
+                        <td className="td-rewards">
+                          <span className="rewards-amount">{poll.rewards}</span>
+                        </td>
+                        <td className="td-creator">
+                          <span className="creator-address">
+                            {poll.creator.slice(0, 6)}...{poll.creator.slice(-4)}
+                          </span>
+                        </td>
+                        <td className="td-time">
+                          <span className={`time-remaining ${getTimeUrgencyClass(poll.endTime, poll.isActive)}`}>
+                            {formatTimeRemaining(poll.endTime, poll.isActive)}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </>
           )}
