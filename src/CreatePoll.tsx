@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { pollsContract, PollCreationParams } from "./utils/contractInteraction";
+import { pollsContract, PollCreationParams, ContractProject } from "./utils/contractInteraction";
 import { parseBlockchainError, logError } from "./utils/errorHandling";
 import PlaceIcon from '@mui/icons-material/Place';
 import LinkIcon from '@mui/icons-material/Link';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import FolderIcon from '@mui/icons-material/Folder';
 
 interface CreatePollProps {
   onBack: () => void;
@@ -21,7 +22,8 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
     rewardPool: 0,
     allowList: "",
     contestType: "open" as "open" | "allowlist",
-    viewType: "text" as "text" | "gallery"
+    viewType: "text" as "text" | "gallery",
+    projectId: 0 // 0 means no project assigned
   });
 
   const [isCreating, setIsCreating] = useState(false);
@@ -31,10 +33,26 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
   const [walletAddress, setWalletAddress] = useState("");
   const [walletName, setWalletName] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
+  const [projects, setProjects] = useState<ContractProject[]>([]);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
 
   useEffect(() => {
     checkWalletConnection();
+    loadProjects();
   }, []);
+
+  const loadProjects = async () => {
+    setIsLoadingProjects(true);
+    try {
+      const allProjects = await pollsContract.getAllProjects();
+      setProjects(allProjects);
+    } catch (err) {
+      console.error("Error loading projects:", err);
+      // Don't show error to user, just fail silently
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  };
 
   const checkWalletConnection = async () => {
     const connected = await pollsContract.isWalletConnected();
@@ -130,7 +148,8 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
         title: formData.title,
         description: formData.description,
         options: filteredOptions,
-        durationInSeconds
+        durationInSeconds,
+        projectId: formData.projectId > 0 ? formData.projectId : undefined
       };
       console.log("🚀 Creating poll with parameters:", pollParams);
 
@@ -150,7 +169,8 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
         rewardPool: 0,
         allowList: "",
         contestType: "open",
-        viewType: "text"
+        viewType: "text",
+        projectId: 0
       });
 
       // Redirect to polls list after a short delay to show the success message
@@ -235,7 +255,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
             {/* Basic Information */}
             <div className="form-section">
               <h2>Basic Information</h2>
-              
+
               <div className="form-group">
                 <label htmlFor="title">Poll Title *</label>
                 <input
@@ -258,6 +278,31 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                   rows={4}
                   maxLength={500}
                 />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="project">
+                  <FolderIcon sx={{ fontSize: 18, marginRight: 0.5, verticalAlign: 'middle' }} />
+                  Project (Optional)
+                </label>
+                <select
+                  id="project"
+                  value={formData.projectId}
+                  onChange={(e) => setFormData(prev => ({ ...prev, projectId: parseInt(e.target.value) }))}
+                  disabled={isLoadingProjects}
+                >
+                  <option value={0}>No Project (Standalone Poll)</option>
+                  {projects.map(project => (
+                    <option key={project.id} value={parseInt(project.id)}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+                <small>
+                  {isLoadingProjects ? "Loading projects..." :
+                   projects.length === 0 ? "No projects available. Create a project first to organize your polls." :
+                   "Organize this poll under a project for better management"}
+                </small>
               </div>
             </div>
 
