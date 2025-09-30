@@ -871,12 +871,28 @@ export class PollsContract {
 
       console.log(`📋 Retrieved ${events.length} events from contract`);
 
+      // Log all events for debugging
+      if (events.length > 0) {
+        console.log('📄 Sample events:', events.slice(0, 3).map(e => ({
+          data: e.data.substring(0, 100),
+          context: e.context
+        })));
+      }
+
+      // Try multiple patterns to find project events
       const projectEvents = events.filter(event => {
         const data = event.data;
-        return data.includes('|') && data.includes('Project ') && data.includes(':');
+        // Pattern 1: Contains pipe separator and "Project"
+        const pattern1 = data.includes('|') && (data.includes('Project ') || data.includes('project'));
+        // Pattern 2: Project created event
+        const pattern2 = data.includes('Project created') || data.includes('project created');
+        // Pattern 3: Contains project ID pattern
+        const pattern3 = data.match(/Project created with ID: \d+/i);
+
+        return pattern1 || pattern2 || pattern3;
       });
 
-      console.log(`📁 Found ${projectEvents.length} project events`);
+      console.log(`📁 Found ${projectEvents.length} project events using flexible patterns`);
 
       const projects: ContractProject[] = [];
       const processedIds = new Set<string>();
@@ -885,6 +901,37 @@ export class PollsContract {
         try {
           let projectDataStr = event.data;
 
+          console.log(`🔍 Processing event: "${projectDataStr.substring(0, 150)}..."`);
+
+          // Handle project creation notification as fallback
+          if (projectDataStr.includes('Project created with ID:')) {
+            // Extract basic info from creation notification
+            // Format: "Project created with ID: X by ADDRESS"
+            const match = projectDataStr.match(/Project created with ID: (\d+) by (AU\w+)/);
+            if (match) {
+              const projectId = match[1];
+              const creator = match[2];
+
+              if (!processedIds.has(projectId)) {
+                // Create a basic project object from the notification
+                const basicProject: ContractProject = {
+                  id: projectId,
+                  name: `Project #${projectId}`,
+                  description: 'Created on Massa blockchain',
+                  creator: creator,
+                  createdAt: Date.now(),
+                  pollIds: []
+                };
+
+                projects.push(basicProject);
+                processedIds.add(projectId);
+                console.log(`⚠️ Using fallback data for project #${projectId} (contract not emitting full data)`);
+              }
+            }
+            continue;
+          }
+
+          // Remove "Project :" prefix if present
           if (projectDataStr.includes('Project ') && projectDataStr.includes(':')) {
             const colonIndex = projectDataStr.indexOf(':');
             projectDataStr = projectDataStr.substring(colonIndex + 1).trim();
@@ -898,6 +945,7 @@ export class PollsContract {
           }
         } catch (parseError) {
           console.log(`⚠️ Failed to parse project event:`, parseError);
+          console.log(`   Event data was: "${event.data}"`);
           continue;
         }
       }
@@ -905,6 +953,15 @@ export class PollsContract {
       projects.sort((a, b) => parseInt(b.id) - parseInt(a.id));
 
       console.log(`\n✅ Project retrieval completed! Found ${projects.length} projects`);
+
+      if (projects.length === 0 && events.length > 0) {
+        console.warn('⚠️ No projects found despite having events. This could mean:');
+        console.warn('   1. The smart contract is not emitting project data in the expected format');
+        console.warn('   2. Events are being emitted but not yet indexed');
+        console.warn('   3. The contract address may be incorrect');
+        console.warn(`   Current contract address: ${this.contractAddress}`);
+      }
+
       return projects;
     } catch (error) {
       console.error('💥 Failed to retrieve projects:', error);
@@ -1062,5 +1119,6 @@ export class PollsContract {
 }
 
 // Create a singleton instance
-const contractAddress = import.meta.env.VITE_POLLS_CONTRACT_ADDRESS || "AS1S3n9oCcsQmzPLKydnqZAFyhCyVhvaThnC11f7xyMzKDEkjkX6";
+const contractAddress = import.meta.env.VITE_POLLS_CONTRACT_ADDRESS;
+console.log('contractAddress', contractAddress);
 export const pollsContract = new PollsContract(contractAddress);
