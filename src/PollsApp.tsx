@@ -51,6 +51,9 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
 
+  // View mode state (beta table view or classic card view)
+  const [viewMode, setViewMode] = useState<'beta' | 'classic'>('beta');
+
   // Live countdown update
   const [, setTimeUpdateTrigger] = useState(0);
 
@@ -589,6 +592,22 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                   )}
                 </div>
                 <div className="polls-header-right">
+                  <div className="view-mode-toggle">
+                    <button
+                      className={`view-mode-btn ${viewMode === 'beta' ? 'active' : ''}`}
+                      onClick={() => setViewMode('beta')}
+                      title="Table View (Beta)"
+                    >
+                      📊 Beta
+                    </button>
+                    <button
+                      className={`view-mode-btn ${viewMode === 'classic' ? 'active' : ''}`}
+                      onClick={() => setViewMode('classic')}
+                      title="Card View (Classic)"
+                    >
+                      🎴 Classic
+                    </button>
+                  </div>
                   <label className="auto-refresh-toggle">
                     <input
                       type="checkbox"
@@ -603,70 +622,128 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                 </div>
               </div>
               
-              <div className="polls-table-container">
-                <table className="polls-table">
-                  <thead>
-                    <tr>
-                      <th className="th-poll">POLL</th>
-                      <th className="th-status">STATUS</th>
-                      <th className="th-votes">VOTES</th>
-                      <th className="th-rewards">REWARDS</th>
-                      <th className="th-creator">CREATOR</th>
-                      <th className="th-time">TIME REMAINING</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {polls.map(poll => (
-                      <tr
-                        key={poll.id}
-                        className={`poll-row ${!poll.isActive ? 'poll-inactive' : ''}`}
-                        onClick={() => setSelectedPoll(poll)}
-                      >
-                        <td className="td-poll">
-                          <div className="poll-cell">
-                            <div className="poll-icon">
-                              <span>🗳️</span>
-                            </div>
-                            <div className="poll-info">
-                              <div className="poll-title-row">
-                                <span className="poll-title">{poll.title}</span>
-                                <span className="poll-id">#{poll.id}</span>
+              {/* Beta View - Table Layout */}
+              {viewMode === 'beta' && (
+                <div className="polls-table-container">
+                  <table className="polls-table">
+                    <thead>
+                      <tr>
+                        <th className="th-poll">POLL</th>
+                        <th className="th-status">STATUS</th>
+                        <th className="th-votes">VOTES</th>
+                        <th className="th-rewards">REWARDS</th>
+                        <th className="th-creator">CREATOR</th>
+                        <th className="th-time">TIME REMAINING</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {polls.map(poll => (
+                        <tr
+                          key={poll.id}
+                          className={`poll-row ${!poll.isActive ? 'poll-inactive' : ''}`}
+                          onClick={() => setSelectedPoll(poll)}
+                        >
+                          <td className="td-poll">
+                            <div className="poll-cell">
+                              <div className="poll-icon">
+                                <span>🗳️</span>
                               </div>
-                              <span className="poll-description">
-                                {poll.description.length > 60
-                                  ? `${poll.description.substring(0, 60)}...`
-                                  : poll.description
-                                }
-                              </span>
+                              <div className="poll-info">
+                                <div className="poll-title-row">
+                                  <span className="poll-title">{poll.title}</span>
+                                  <span className="poll-id">#{poll.id}</span>
+                                </div>
+                                <span className="poll-description">
+                                  {poll.description.length > 60
+                                    ? `${poll.description.substring(0, 60)}...`
+                                    : poll.description
+                                  }
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="td-status">
-                          <span className={`status-badge ${poll.isActive ? 'active' : 'inactive'}`}>
+                          </td>
+                          <td className="td-status">
+                            <span className={`status-badge ${poll.isActive ? 'active' : 'inactive'}`}>
+                              {poll.isActive ? 'Active' : 'Ended'}
+                            </span>
+                          </td>
+                          <td className="td-votes">
+                            <span className="votes-count">{poll.totalVotes}</span>
+                          </td>
+                          <td className="td-rewards">
+                            <span className="rewards-amount">{poll.rewards}</span>
+                          </td>
+                          <td className="td-creator">
+                            <span className="creator-address">
+                              {poll.creator.slice(0, 6)}...{poll.creator.slice(-4)}
+                            </span>
+                          </td>
+                          <td className="td-time">
+                            <span className={`time-remaining ${getTimeUrgencyClass(poll.endTime, poll.isActive)}`}>
+                              {formatTimeRemaining(poll.endTime, poll.isActive)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Classic View - Card Layout */}
+              {viewMode === 'classic' && (
+                <div className="polls-grid-classic">
+                  {polls.map(poll => (
+                    <div
+                      key={poll.id}
+                      className={`poll-card-classic ${!poll.isActive ? 'poll-inactive' : ''}`}
+                      onClick={() => setSelectedPoll(poll)}
+                    >
+                      <div className="poll-card-header">
+                        <div className="poll-card-title-row">
+                          <h3>{poll.title}</h3>
+                          <span className={`status-pill ${poll.isActive ? 'active' : 'ended'}`}>
                             {poll.isActive ? 'Active' : 'Ended'}
                           </span>
-                        </td>
-                        <td className="td-votes">
-                          <span className="votes-count">{poll.totalVotes}</span>
-                        </td>
-                        <td className="td-rewards">
-                          <span className="rewards-amount">{poll.rewards}</span>
-                        </td>
-                        <td className="td-creator">
-                          <span className="creator-address">
-                            {poll.creator.slice(0, 6)}...{poll.creator.slice(-4)}
-                          </span>
-                        </td>
-                        <td className="td-time">
-                          <span className={`time-remaining ${getTimeUrgencyClass(poll.endTime, poll.isActive)}`}>
-                            {formatTimeRemaining(poll.endTime, poll.isActive)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        </div>
+                        <p className="poll-card-description">{poll.description}</p>
+                      </div>
+
+                      <div className="poll-card-stats">
+                        <div className="stat-box">
+                          <span className="stat-icon">👥</span>
+                          <div className="stat-details">
+                            <span className="stat-value">{poll.totalVotes}</span>
+                            <span className="stat-label">responses</span>
+                          </div>
+                        </div>
+                        <div className="stat-box">
+                          <span className="stat-icon">📅</span>
+                          <div className="stat-details">
+                            <span className="stat-value">
+                              {poll.isActive ? formatTimeRemaining(poll.endTime, poll.isActive) : 'Ended'}
+                            </span>
+                            <span className="stat-label">
+                              {poll.isActive ? new Date(poll.endTime).toLocaleDateString() : new Date(poll.endTime).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="poll-card-footer">
+                        <button className="poll-action-btn">
+                          {poll.isActive ? 'View Results' : 'Edit & Publish'}
+                        </button>
+                        <div className="poll-card-menu">⋮</div>
+                      </div>
+
+                      <div className="poll-card-meta">
+                        <span className="poll-created">Created {new Date(poll.endTime - (poll.isActive ? 7 * 24 * 60 * 60 * 1000 : 0)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>

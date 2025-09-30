@@ -1322,6 +1322,235 @@ html, body {
   }
 }
 
+/* View Mode Toggle */
+.view-mode-toggle {
+  display: inline-flex;
+  gap: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.view-mode-btn {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.view-mode-btn:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.view-mode-btn.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+/* Classic Card View */
+.polls-grid-classic {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  padding: 20px;
+}
+
+.poll-card-classic {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.poll-card-classic:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.poll-card-classic.poll-inactive {
+  opacity: 0.7;
+  background: #f9fafb;
+}
+
+.poll-card-header {
+  margin-bottom: 20px;
+}
+
+.poll-card-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.poll-card-classic h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.4;
+}
+
+.status-pill {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.status-pill.active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-pill.ended {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.poll-card-description {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.poll-card-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.stat-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.stat-icon {
+  font-size: 24px;
+}
+
+.stat-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.poll-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.poll-action-btn {
+  background: #111827;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex: 1;
+  margin-right: 12px;
+}
+
+.poll-action-btn:hover {
+  background: #1f2937;
+  transform: translateY(-1px);
+}
+
+.poll-card-menu {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.poll-card-menu:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.poll-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.poll-created {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+/* Responsive for Classic View */
+@media (max-width: 768px) {
+  .polls-grid-classic {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 12px;
+  }
+
+  .poll-card-classic {
+    padding: 20px;
+  }
+
+  .poll-card-stats {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .view-mode-toggle {
+    width: 100%;
+    margin-bottom: 12px;
+  }
+
+  .view-mode-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
 .polls-app .poll-card h3 {
   color: #FFD700;
   margin-bottom: 15px;
