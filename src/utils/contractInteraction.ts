@@ -377,8 +377,19 @@ export class PollsContract {
       }
 
       // Determine if poll is active
-      const currentTime = Date.now();
-      const isActive = status === 0 && currentTime < endTime;
+      // NOTE: Contract uses Context.timestamp() which returns SECONDS, not milliseconds
+      // We need to convert our millisecond timestamps to seconds for comparison
+      const currentTimeMs = Date.now();
+      const currentTimeSec = Math.floor(currentTimeMs / 1000);
+      const endTimeSec = Math.floor(endTime / 1000);
+      const isActive = status === 0 && currentTimeSec < endTimeSec;
+      
+      console.log(`⏰ Timestamp Analysis:`);
+      console.log(`   Current Time (ms): ${currentTimeMs}`);
+      console.log(`   Current Time (sec): ${currentTimeSec}`);
+      console.log(`   End Time (ms): ${endTime}`);
+      console.log(`   End Time (sec): ${endTimeSec}`);
+      console.log(`   Time comparison (sec): ${currentTimeSec} < ${endTimeSec} = ${currentTimeSec < endTimeSec}`);
 
       console.log(`📊 Successfully parsed poll:`);
       console.log(`   ID: ${id}`);
@@ -386,9 +397,13 @@ export class PollsContract {
       console.log(`   Description: "${description}"`);
       console.log(`   Options: [${options.map(opt => `"${opt}"`).join(', ')}]`);
       console.log(`   Creator: ${creator}`);
-      console.log(`   Start Time: ${new Date(startTime).toLocaleString()}`);
-      console.log(`   End Time: ${new Date(endTime).toLocaleString()}`);
-      console.log(`   Status: ${status} (${isActive ? 'Active' : 'Inactive'})`);
+      console.log(`   Start Time: ${new Date(startTime).toLocaleString()} (${startTime})`);
+      console.log(`   End Time: ${new Date(endTime).toLocaleString()} (${endTime})`);
+      console.log(`   Current Time: ${new Date(currentTimeMs).toLocaleString()} (${currentTimeMs})`);
+      console.log(`   Raw Status: ${status}`);
+      console.log(`   Status Check: status === 0 ? ${status === 0}`);
+      console.log(`   Time Check: currentTimeSec < endTimeSec ? ${currentTimeSec < endTimeSec}`);
+      console.log(`   Final Active Status: ${isActive ? 'Active' : 'Inactive'}`);
       console.log(`   Votes: [${votes.join(', ')}]`);
 
       return {
@@ -434,7 +449,7 @@ export class PollsContract {
         func: "vote",
         parameter: args.serialize(),
         coins: 0n,
-        fee: BigInt(0.01 * (10 ** 9)), // 0.01 MASSA in nanoMAS for fee
+        fee: Mas.fromString('0.01'), // Use same fee format as working test scripts
       });
 
       console.log("Vote transaction result:", result);
@@ -494,20 +509,37 @@ export class PollsContract {
     }
   }
 
-  async hasVoted(): Promise<boolean> {
+  async hasVoted(pollId: string, voterAddress: string): Promise<boolean> {
     try {
-      // const args = new Args()
-      //   .addString(pollId)
-      //   .addString(voterAddress);
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+      
+      const args = new Args()
+        .addString(pollId)
+        .addString(voterAddress);
 
-      // In real implementation:
-      // const result = await this.client.readSmartContract({
-      //   address: this.contractAddress,
-      //   functionName: "hasVoted",
-      //   parameter: args.serialize(),
-      // });
+      // Call the contract function to check if user has voted
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "hasVoted",
+        parameter: args.serialize(),
+      });
 
-      // Simulate voting status
+      // Get events to find the hasVoted result
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      // Look for the hasVoted result event
+      const hasVotedEvents = events.filter(event => 
+        event.data.includes(`has voted on poll ${pollId}:`)
+      );
+
+      if (hasVotedEvents.length > 0) {
+        const latestEvent = hasVotedEvents[hasVotedEvents.length - 1];
+        return latestEvent.data.includes('true');
+      }
+
       return false;
     } catch (error) {
       console.error("Error checking vote status:", error);

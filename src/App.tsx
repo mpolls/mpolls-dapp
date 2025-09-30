@@ -3,6 +3,7 @@ import { MassaLogo } from "@massalabs/react-ui-kit";
 import PollsApp from './PollsApp';
 import Navigation from './components/Navigation';
 import { pollsContract, ContractPoll } from './utils/contractInteraction';
+import { ToastProvider } from './components/ToastContainer';
 import './App.css';
 
 type PageType = 'home' | 'polls' | 'create' | 'admin';
@@ -63,23 +64,24 @@ function App() {
   // Render different pages based on current page
   if (currentPage === 'polls' || currentPage === 'create' || currentPage === 'admin') {
     return (
-      <>
-        <Navigation 
-          onNavigate={handleNavigation} 
-          currentPage={currentPage} 
+      <ToastProvider>
+        <Navigation
+          onNavigate={handleNavigation}
+          currentPage={currentPage}
         />
         <PollsApp initialView={currentPage} onNavigate={handleNavigation} />
-      </>
+      </ToastProvider>
     );
   }
 
   return (
-    <div className="landing-page">
-      <Navigation 
-        onNavigate={handleNavigation} 
-        currentPage={currentPage} 
-        onScrollToSection={scrollToSection}
-      />
+    <ToastProvider>
+      <div className="landing-page">
+        <Navigation
+          onNavigate={handleNavigation}
+          currentPage={currentPage}
+          onScrollToSection={scrollToSection}
+        />
 
       <header className="hero-section">
         <div className="hero-content">
@@ -203,6 +205,7 @@ function App() {
         </button>
       </section>
     </div>
+    </ToastProvider>
   );
 }
 

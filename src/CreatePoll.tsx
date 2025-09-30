@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { pollsContract, PollCreationParams } from "./utils/contractInteraction";
+import { parseBlockchainError, logError } from "./utils/errorHandling";
 
 interface CreatePollProps {
   onBack: () => void;
@@ -57,8 +58,10 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
       } else {
         setError("Failed to connect wallet. Please make sure you have MassaStation or Bearby wallet installed and unlocked.");
       }
-    } catch {
-      setError("Failed to connect wallet. Please make sure you have MassaStation or Bearby wallet installed and unlocked.");
+    } catch (err) {
+      logError(err, { action: 'connecting wallet' });
+      const friendlyError = parseBlockchainError(err, { action: 'connecting wallet' });
+      setError(`${friendlyError.message} ${friendlyError.suggestion}`);
     } finally {
       setIsConnecting(false);
     }
@@ -152,8 +155,9 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
       }, 2000); // 2 second delay
 
     } catch (err) {
-      console.error("Error creating poll:", err);
-      setError("Failed to create poll. Please try again.");
+      logError(err, { action: 'creating poll' });
+      const friendlyError = parseBlockchainError(err, { action: 'creating poll' });
+      setError(`${friendlyError.message} ${friendlyError.suggestion}`);
     } finally {
       setIsCreating(false);
     }

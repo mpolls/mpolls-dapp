@@ -3,6 +3,9 @@ import CreatePoll from "./CreatePoll";
 import AdminPage from "./AdminPage";
 import Navigation from "./components/Navigation";
 import { pollsContract, ContractPoll } from "./utils/contractInteraction";
+import { parseBlockchainError, logError } from "./utils/errorHandling";
+import { useToast } from "./components/ToastContainer";
+import { formatTimeRemaining, getTimeUrgencyClass } from "./utils/timeFormat";
 
 // Convert ContractPoll to display format
 interface Poll extends Omit<ContractPoll, 'id' | 'votes'> {
@@ -21,6 +24,7 @@ interface PollsAppProps {
 }
 
 const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }) => {
+  const toast = useToast();
   const [polls, setPolls] = useState<Poll[]>([]);
   const [isLoadingPolls, setIsLoadingPolls] = useState(true);
   const [pollsError, setPollsError] = useState<string | null>(null);
@@ -29,6 +33,26 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
   const [selectedPoll, setSelectedPoll] = useState<Poll | null>(null);
   const [votedPolls, setVotedPolls] = useState<Set<number>>(new Set());
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // Wallet connection state
+  const [isWalletConnected, setIsWalletConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [isConnectingWallet, setIsConnectingWallet] = useState(false);
+
+  // Voting feedback state
+  const [votingStatus, setVotingStatus] = useState<{
+    pollId: number | null;
+    isVoting: boolean;
+    message: string;
+    type: 'success' | 'error' | 'info' | null;
+  }>({ pollId: null, isVoting: false, message: '', type: null });
+
+  // Auto-refresh state
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
+
+  // Live countdown update
+  const [, setTimeUpdateTrigger] = useState(0);
 
   const CONTRACT_CREATOR_ADDRESS = "AU1Pd3bod1Js2xD71GLFd1Q1dA8tnugsHroL54Rn7SzYY5KiozfS";
 
@@ -40,7 +64,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
   };
 
   useEffect(() => {
-    checkAdminStatus();
+    checkWalletConnection();
     fetchPolls();
   }, []);
 
@@ -48,10 +72,42 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
     setCurrentView(initialView);
   }, [initialView]);
 
+  // Auto-refresh polls every 30 seconds when enabled and on polls view
+  useEffect(() => {
+    if (!autoRefreshEnabled || currentView !== 'polls' || selectedPoll) {
+      return;
+    }
+
+    const refreshInterval = setInterval(() => {
+      console.log('🔄 Auto-refreshing polls...');
+      fetchPollsQuietly();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(refreshInterval);
+  }, [autoRefreshEnabled, currentView, selectedPoll]);
+
+  // Update time displays every second for live countdown
+  useEffect(() => {
+    const timeUpdateInterval = setInterval(() => {
+      setTimeUpdateTrigger(prev => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(timeUpdateInterval);
+  }, []);
+
+  // Fetch polls with loading indicator (for initial load and manual refresh)
   const fetchPolls = async () => {
     setIsLoadingPolls(true);
     setPollsError(null);
-    
+    await fetchPollsInternal();
+  };
+
+  // Fetch polls quietly without showing loading state (for auto-refresh)
+  const fetchPollsQuietly = async () => {
+    await fetchPollsInternal();
+  };
+
+  const fetchPollsInternal = async () => {
     try {
       console.log("🔄 Fetching polls from blockchain...");
       const contractPolls = await pollsContract.getAllPolls();
@@ -114,44 +170,208 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
       }
       
       setPolls(displayPolls);
-    } catch (error) {
-      console.error("❌ Failed to fetch polls:", error);
-      if (error instanceof Error) {
-        console.error("   Error message:", error.message);
-        console.error("   Error stack:", error.stack);
+      setLastRefreshTime(new Date());
+
+      // Check voting status for each poll if wallet is connected
+      if (isWalletConnected && displayPolls.length > 0) {
+        await checkVotingStatus(displayPolls);
       }
-      setPollsError("Failed to load polls from blockchain. Please try again.");
+    } catch (error) {
+      logError(error, { action: 'fetching polls' });
+      const friendlyError = parseBlockchainError(error, { action: 'fetching polls' });
+      setPollsError(`${friendlyError.message} ${friendlyError.suggestion}`);
     } finally {
       setIsLoadingPolls(false);
     }
   };
 
-  const checkAdminStatus = async () => {
+  const checkVotingStatus = async (polls: Poll[]) => {
+    try {
+      const walletAddress = await pollsContract.getWalletAddress();
+      if (!walletAddress) return;
+      
+      console.log(`🔍 Checking voting status for ${polls.length} polls...`);
+      const voted = new Set<number>();
+      
+      // Check voting status for each poll
+      for (const poll of polls) {
+        try {
+          const hasVoted = await pollsContract.hasVoted(poll.id.toString(), walletAddress);
+          if (hasVoted) {
+            voted.add(poll.id);
+            console.log(`✅ User has voted on poll ${poll.id}: "${poll.title}"`);
+          } else {
+            console.log(`⭕ User has not voted on poll ${poll.id}: "${poll.title}"`);
+          }
+        } catch (error) {
+          console.log(`⚠️ Failed to check voting status for poll ${poll.id}:`, error);
+        }
+      }
+      
+      setVotedPolls(voted);
+      console.log(`📊 Voting status check complete. Voted on ${voted.size} out of ${polls.length} polls.`);
+    } catch (error) {
+      console.error("❌ Failed to check voting status:", error);
+    }
+  };
+
+  const checkWalletConnection = async () => {
     try {
       const connected = await pollsContract.isWalletConnected();
+      setIsWalletConnected(connected);
       
       if (connected) {
         const address = await pollsContract.getWalletAddress();
+        setWalletAddress(address);
         const isContractCreator = address === CONTRACT_CREATOR_ADDRESS;
         setIsAdmin(isContractCreator);
+      } else {
+        setWalletAddress(null);
+        setIsAdmin(false);
       }
     } catch (error) {
-      console.error("Failed to check admin status:", error);
+      console.error("Failed to check wallet connection:", error);
+      setIsWalletConnected(false);
+      setWalletAddress(null);
+      setIsAdmin(false);
+    }
+  };
+
+  const connectWallet = async () => {
+    setIsConnectingWallet(true);
+    try {
+      const connected = await pollsContract.connectWallet();
+      if (connected) {
+        await checkWalletConnection();
+        toast.success('Wallet connected successfully!');
+      } else {
+        toast.error('Failed to connect wallet. Please try again.');
+      }
+    } catch (error) {
+      logError(error, { action: 'connecting wallet' });
+      const friendlyError = parseBlockchainError(error, { action: 'connecting wallet' });
+      toast.error(`${friendlyError.message} ${friendlyError.suggestion}`);
+    } finally {
+      setIsConnectingWallet(false);
     }
   };
 
   const handleVote = async (pollId: number, optionIndex: number) => {
+    // Check if already voted
     if (votedPolls.has(pollId)) return;
     
+    // Check wallet connection first
+    if (!isWalletConnected) {
+      setVotingStatus({
+        pollId,
+        isVoting: false,
+        message: 'Please connect your wallet to vote',
+        type: 'error'
+      });
+      return;
+    }
+    
+    // Get wallet address for blockchain vote checking
+    const walletAddress = await pollsContract.getWalletAddress();
+    if (!walletAddress) {
+      setVotingStatus({
+        pollId,
+        isVoting: false,
+        message: 'Could not get wallet address. Please try reconnecting your wallet.',
+        type: 'error'
+      });
+      return;
+    }
+    
+    // Check if poll is active
+    const poll = polls.find(p => p.id === pollId);
+    console.log(`🗳️ Attempting to vote on poll ${pollId}:`);
+    console.log(`   Poll found:`, poll);
+    console.log(`   Wallet address:`, walletAddress);
+    if (poll) {
+      console.log(`   Poll ID: ${poll.id}`);
+      console.log(`   Poll Title: "${poll.title}"`);
+      console.log(`   Poll isActive: ${poll.isActive}`);
+      console.log(`   Poll status: ${poll.status}`);
+      console.log(`   Poll endTime: ${new Date(poll.endTime).toLocaleString()} (${poll.endTime})`);
+      console.log(`   Current time: ${new Date().toLocaleString()} (${Date.now()})`);
+      console.log(`   Time remaining: ${poll.endTime - Date.now()}ms`);
+    }
+    
+    if (!poll || !poll.isActive) {
+      console.log(`❌ Vote blocked: Poll ${pollId} is ${!poll ? 'not found' : 'inactive'}`);
+      setVotingStatus({
+        pollId,
+        isVoting: false,
+        message: 'This poll is no longer active and cannot accept votes',
+        type: 'error'
+      });
+      return;
+    }
+    
+    // Set initial voting state
+    setVotingStatus({
+      pollId,
+      isVoting: true,
+      message: 'Checking if you have already voted...',
+      type: 'info'
+    });
+    
     try {
+      // Check if user has already voted on blockchain
+      console.log(`🔍 Checking if ${walletAddress} has voted on poll ${pollId}...`);
+      const hasVotedOnChain = await pollsContract.hasVoted(pollId.toString(), walletAddress);
+      
+      if (hasVotedOnChain) {
+        console.log(`❌ Vote blocked: User has already voted on poll ${pollId}`);
+        setVotedPolls(prev => new Set(prev).add(pollId)); // Update local state
+        setVotingStatus({
+          pollId,
+          isVoting: false,
+          message: 'You have already voted on this poll',
+          type: 'error'
+        });
+        return;
+      }
+      
+      console.log(`✅ Vote allowed: User has not voted on poll ${pollId}, proceeding...`);
+      
+      // Update voting state
+      setVotingStatus({
+        pollId,
+        isVoting: true,
+        message: 'Submitting your vote to the blockchain...',
+        type: 'info'
+      });
+      
       // Call the contract to vote
+      console.log(`📝 Submitting vote: Poll ${pollId}, Option ${optionIndex}`);
       await pollsContract.vote(pollId.toString(), optionIndex);
       
+      // Mark as voted locally
       setVotedPolls(prev => new Set(prev).add(pollId));
-      console.log(`Successfully voted for option ${optionIndex} in poll ${pollId}`);
+
+      // Show success message
+      toast.success(`Successfully voted for "${poll.options[optionIndex]}"! Your vote has been recorded on the blockchain.`, 6000);
+
+      // Refresh polls to show updated vote counts
+      console.log('🔄 Refreshing polls to show updated vote counts...');
+      setTimeout(() => {
+        fetchPollsQuietly();
+      }, 3000);
+
+      console.log(`✅ Successfully voted for option ${optionIndex} (${poll.options[optionIndex]}) in poll ${pollId}`);
     } catch (error) {
-      console.error("Error voting:", error);
-      // You could show an error message to the user here
+      logError(error, { action: 'voting on poll', pollId: pollId.toString() });
+      const friendlyError = parseBlockchainError(error, { action: 'voting on poll', pollId: pollId.toString() });
+
+      // Update local state if already voted
+      if (friendlyError.title === 'Already Voted') {
+        setVotedPolls(prev => new Set(prev).add(pollId));
+      }
+
+      // Show error message to user
+      toast.error(`${friendlyError.message} ${friendlyError.suggestion}`, 8000);
     }
   };
 
@@ -196,6 +416,30 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
               <p>Decentralized voting on the Massa blockchain</p>
             </div>
             <div className="header-right">
+              {/* Wallet Connection Status */}
+              <div className="wallet-section">
+                {isWalletConnected ? (
+                  <div className="wallet-connected">
+                    <span className="wallet-status">✅ Wallet Connected</span>
+                    {walletAddress && (
+                      <span className="wallet-address">
+                        {walletAddress.length > 20 ? 
+                          `${walletAddress.slice(0, 8)}...${walletAddress.slice(-8)}` : 
+                          walletAddress
+                        }
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <button 
+                    className="connect-wallet-btn"
+                    onClick={connectWallet}
+                    disabled={isConnectingWallet}
+                  >
+                    {isConnectingWallet ? '🔄 Connecting...' : '🔗 Connect Wallet'}
+                  </button>
+                )}
+              </div>
               <a 
                 href="https://explorer.massa.net/mainnet" 
                 target="_blank" 
@@ -252,12 +496,21 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
 
             <div className="voting-section">
               <h3>Cast Your Vote</h3>
+              
+              {/* Voting Status Messages */}
+              {votingStatus.message && (
+                <div className={`voting-feedback voting-${votingStatus.type}`}>
+                  {votingStatus.isVoting && <span className="voting-spinner">🔄 </span>}
+                  {votingStatus.message}
+                </div>
+              )}
               {selectedPoll.options.map((option, index) => (
                 <div key={index} className="vote-option">
                   <button
-                    className={`vote-btn ${votedPolls.has(selectedPoll.id) ? 'voted' : ''}`}
+                    className={`vote-btn ${votedPolls.has(selectedPoll.id) ? 'voted' : ''} ${!selectedPoll.isActive ? 'inactive' : ''}`}
                     onClick={() => handleVote(selectedPoll.id, index)}
-                    disabled={votedPolls.has(selectedPoll.id)}
+                    disabled={votedPolls.has(selectedPoll.id) || !selectedPoll.isActive || votingStatus.isVoting}
+                    title={!selectedPoll.isActive ? 'This poll is no longer active' : ''}
                   >
                     {option}
                   </button>
@@ -326,19 +579,39 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
           {!isLoadingPolls && !pollsError && polls.length > 0 && (
             <>
               <div className="polls-header-info">
-                <h3>📊 Blockchain Polls</h3>
-                <p>Showing {polls.length} poll{polls.length !== 1 ? 's' : ''} from the Massa blockchain</p>
-                <button className="refresh-polls-btn" onClick={fetchPolls}>
-                  🔄 Refresh
-                </button>
+                <div className="polls-header-left">
+                  <h3>📊 Blockchain Polls</h3>
+                  <p>Showing {polls.length} poll{polls.length !== 1 ? 's' : ''} from the Massa blockchain</p>
+                  {lastRefreshTime && (
+                    <small className="last-refresh">
+                      Last updated: {lastRefreshTime.toLocaleTimeString()}
+                    </small>
+                  )}
+                </div>
+                <div className="polls-header-right">
+                  <label className="auto-refresh-toggle">
+                    <input
+                      type="checkbox"
+                      checked={autoRefreshEnabled}
+                      onChange={(e) => setAutoRefreshEnabled(e.target.checked)}
+                    />
+                    <span>Auto-refresh (30s)</span>
+                  </label>
+                  <button className="refresh-polls-btn" onClick={fetchPolls}>
+                    🔄 Refresh
+                  </button>
+                </div>
               </div>
               
               <div className="polls-grid">
                 {polls.map(poll => (
-                  <div key={poll.id} className="poll-card" onClick={() => setSelectedPoll(poll)}>
+                  <div key={poll.id} className={`poll-card ${!poll.isActive ? 'poll-inactive' : ''}`} onClick={() => setSelectedPoll(poll)}>
                     <div className="poll-badge">
                       <span className="blockchain-badge">⛓️ On-Chain</span>
                       <span className="poll-id">#{poll.id}</span>
+                      <span className={`poll-status-badge ${poll.isActive ? 'active' : 'inactive'}`}>
+                        {poll.isActive ? '🟢 Active' : '🔴 Ended'}
+                      </span>
                     </div>
                     
                     <h3>{poll.title}</h3>
@@ -347,7 +620,9 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                     <div className="poll-preview">
                       <div className="poll-stats">
                         <span className="votes">{poll.totalVotes} votes</span>
-                        <span className="time-left">{poll.timeLeft}</span>
+                        <span className={`time-left ${getTimeUrgencyClass(poll.endTime, poll.isActive)}`}>
+                          {formatTimeRemaining(poll.endTime, poll.isActive)}
+                        </span>
                       </div>
                       <div className="poll-rewards">
                         🏆 {poll.rewards}
@@ -357,6 +632,12 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                     <div className="poll-creator">
                       Created by {poll.creator}
                     </div>
+                    
+                    {!poll.isActive && (
+                      <div className="poll-inactive-overlay">
+                        <span>Voting Ended</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
