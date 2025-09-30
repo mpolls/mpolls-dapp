@@ -13,6 +13,21 @@ export interface PollCreationParams {
   description: string;
   options: string[];
   durationInSeconds: number;
+  projectId?: number; // Optional project assignment
+}
+
+export interface ProjectCreationParams {
+  name: string;
+  description: string;
+}
+
+export interface ContractProject {
+  id: string;
+  name: string;
+  description: string;
+  creator: string;
+  createdAt: number;
+  pollIds: string[];
 }
 
 export interface ContractPoll {
@@ -26,6 +41,7 @@ export interface ContractPoll {
   createdAt: number;
   endTime: number;
   status: 'active' | 'closed' | 'ended';
+  projectId?: number; // Optional project assignment
 }
 
 export class PollsContract {
@@ -137,13 +153,18 @@ export class PollsContract {
         .addString(params.title)
         .addString(params.description)
         .addU32(BigInt(params.options.length));
-      
+
       // Add each option separately
       params.options.forEach(option => {
         args.addString(option);
       });
-      
+
       args.addU64(BigInt(params.durationInSeconds));
+
+      // Add optional projectId (0 means no project)
+      if (params.projectId && params.projectId > 0) {
+        args.addU64(BigInt(params.projectId));
+      }
 
       console.log("📦 Prepared arguments (matching working implementation):", {
         title: params.title,
@@ -377,8 +398,19 @@ export class PollsContract {
       }
 
       // Determine if poll is active
-      const currentTime = Date.now();
-      const isActive = status === 0 && currentTime < endTime;
+      // NOTE: Contract uses Context.timestamp() which returns SECONDS, not milliseconds
+      // We need to convert our millisecond timestamps to seconds for comparison
+      const currentTimeMs = Date.now();
+      const currentTimeSec = Math.floor(currentTimeMs / 1000);
+      const endTimeSec = Math.floor(endTime / 1000);
+      const isActive = status === 0 && currentTimeSec < endTimeSec;
+      
+      console.log(`⏰ Timestamp Analysis:`);
+      console.log(`   Current Time (ms): ${currentTimeMs}`);
+      console.log(`   Current Time (sec): ${currentTimeSec}`);
+      console.log(`   End Time (ms): ${endTime}`);
+      console.log(`   End Time (sec): ${endTimeSec}`);
+      console.log(`   Time comparison (sec): ${currentTimeSec} < ${endTimeSec} = ${currentTimeSec < endTimeSec}`);
 
       console.log(`📊 Successfully parsed poll:`);
       console.log(`   ID: ${id}`);
@@ -386,9 +418,13 @@ export class PollsContract {
       console.log(`   Description: "${description}"`);
       console.log(`   Options: [${options.map(opt => `"${opt}"`).join(', ')}]`);
       console.log(`   Creator: ${creator}`);
-      console.log(`   Start Time: ${new Date(startTime).toLocaleString()}`);
-      console.log(`   End Time: ${new Date(endTime).toLocaleString()}`);
-      console.log(`   Status: ${status} (${isActive ? 'Active' : 'Inactive'})`);
+      console.log(`   Start Time: ${new Date(startTime).toLocaleString()} (${startTime})`);
+      console.log(`   End Time: ${new Date(endTime).toLocaleString()} (${endTime})`);
+      console.log(`   Current Time: ${new Date(currentTimeMs).toLocaleString()} (${currentTimeMs})`);
+      console.log(`   Raw Status: ${status}`);
+      console.log(`   Status Check: status === 0 ? ${status === 0}`);
+      console.log(`   Time Check: currentTimeSec < endTimeSec ? ${currentTimeSec < endTimeSec}`);
+      console.log(`   Final Active Status: ${isActive ? 'Active' : 'Inactive'}`);
       console.log(`   Votes: [${votes.join(', ')}]`);
 
       return {
@@ -434,7 +470,7 @@ export class PollsContract {
         func: "vote",
         parameter: args.serialize(),
         coins: 0n,
-        fee: BigInt(0.01 * (10 ** 9)), // 0.01 MASSA in nanoMAS for fee
+        fee: Mas.fromString('0.01'), // Use same fee format as working test scripts
       });
 
       console.log("Vote transaction result:", result);
@@ -494,20 +530,37 @@ export class PollsContract {
     }
   }
 
-  async hasVoted(): Promise<boolean> {
+  async hasVoted(pollId: string, voterAddress: string): Promise<boolean> {
     try {
-      // const args = new Args()
-      //   .addString(pollId)
-      //   .addString(voterAddress);
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+      
+      const args = new Args()
+        .addString(pollId)
+        .addString(voterAddress);
 
-      // In real implementation:
-      // const result = await this.client.readSmartContract({
-      //   address: this.contractAddress,
-      //   functionName: "hasVoted",
-      //   parameter: args.serialize(),
-      // });
+      // Call the contract function to check if user has voted
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "hasVoted",
+        parameter: args.serialize(),
+      });
 
-      // Simulate voting status
+      // Get events to find the hasVoted result
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      // Look for the hasVoted result event
+      const hasVotedEvents = events.filter(event => 
+        event.data.includes(`has voted on poll ${pollId}:`)
+      );
+
+      if (hasVotedEvents.length > 0) {
+        const latestEvent = hasVotedEvents[hasVotedEvents.length - 1];
+        return latestEvent.data.includes('true');
+      }
+
       return false;
     } catch (error) {
       console.error("Error checking vote status:", error);
@@ -725,6 +778,285 @@ export class PollsContract {
     } catch (error) {
       console.error("Error funding contract:", error);
       throw new Error(`Failed to fund contract: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // ================= PROJECT MANAGEMENT METHODS =================
+
+  async createProject(params: ProjectCreationParams): Promise<string> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("🚀 Creating project with parameters:", {
+        name: params.name,
+        description: params.description
+      });
+
+      const args = new Args()
+        .addString(params.name)
+        .addString(params.description);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "createProject",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Project creation transaction successful!");
+
+      // Wait for transaction to process
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Try to get the project ID from events
+      try {
+        const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+        const provider = JsonRpcProvider.buildnet();
+
+        const events = await provider.getEvents({
+          smartContractAddress: this.contractAddress,
+        });
+
+        const projectCreateEvents = events.filter(event =>
+          event.data.includes("Project created with ID:")
+        );
+
+        if (projectCreateEvents.length > 0) {
+          const latestEvent = projectCreateEvents[projectCreateEvents.length - 1];
+          const match = latestEvent.data.match(/Project created with ID: (\d+)/);
+          if (match) {
+            console.log(`🎉 Successfully created project with ID: ${match[1]}`);
+            return match[1];
+          }
+        }
+      } catch (eventError) {
+        console.log("Could not fetch event data, but transaction was successful");
+      }
+
+      return "Created successfully";
+    } catch (error) {
+      console.error("Error creating project:", error);
+      throw new Error(`Failed to create project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getAllProjects(): Promise<ContractProject[]> {
+    console.log('📁 Fetching All Projects');
+
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      console.log('📊 Fetching all projects from contract...');
+
+      try {
+        await provider.readSC({
+          target: this.contractAddress,
+          func: 'getAllProjects',
+          parameter: new Args().serialize(),
+        });
+        console.log('✅ Successfully called getAllProjects function');
+      } catch (readError) {
+        console.log('⚠️ ReadSC getAllProjects call failed, continuing with event retrieval');
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      console.log(`📋 Retrieved ${events.length} events from contract`);
+
+      const projectEvents = events.filter(event => {
+        const data = event.data;
+        return data.includes('|') && data.includes('Project ') && data.includes(':');
+      });
+
+      console.log(`📁 Found ${projectEvents.length} project events`);
+
+      const projects: ContractProject[] = [];
+      const processedIds = new Set<string>();
+
+      for (const event of projectEvents) {
+        try {
+          let projectDataStr = event.data;
+
+          if (projectDataStr.includes('Project ') && projectDataStr.includes(':')) {
+            const colonIndex = projectDataStr.indexOf(':');
+            projectDataStr = projectDataStr.substring(colonIndex + 1).trim();
+          }
+
+          const project = this.parseProjectData(projectDataStr);
+          if (project && !processedIds.has(project.id)) {
+            projects.push(project);
+            processedIds.add(project.id);
+            console.log(`✅ Successfully parsed project #${project.id}: "${project.name}"`);
+          }
+        } catch (parseError) {
+          console.log(`⚠️ Failed to parse project event:`, parseError);
+          continue;
+        }
+      }
+
+      projects.sort((a, b) => parseInt(b.id) - parseInt(a.id));
+
+      console.log(`\n✅ Project retrieval completed! Found ${projects.length} projects`);
+      return projects;
+    } catch (error) {
+      console.error('💥 Failed to retrieve projects:', error);
+      return [];
+    }
+  }
+
+  private parseProjectData(projectDataStr: string): ContractProject | null {
+    try {
+      console.log(`🔍 Parsing project data: "${projectDataStr.substring(0, 100)}${projectDataStr.length > 100 ? '...' : ''}"`);
+
+      // Format: id|name|description|creator|createdAt|pollIds
+      const parts = projectDataStr.split('|');
+
+      if (parts.length < 5) {
+        console.log(`⚠️ Invalid project data format: expected 5+ parts, got ${parts.length}`);
+        return null;
+      }
+
+      const id = parts[0];
+      const name = parts[1];
+      const description = parts[2];
+      const creator = parts[3];
+      const createdAt = parseInt(parts[4]);
+
+      const pollIds = parts.length > 5 && parts[5] && parts[5].length > 0
+        ? parts[5].split(',').filter(id => id.length > 0)
+        : [];
+
+      console.log(`📁 Successfully parsed project:`);
+      console.log(`   ID: ${id}`);
+      console.log(`   Name: "${name}"`);
+      console.log(`   Description: "${description}"`);
+      console.log(`   Creator: ${creator}`);
+      console.log(`   Polls: ${pollIds.length}`);
+
+      return {
+        id,
+        name,
+        description,
+        creator,
+        createdAt,
+        pollIds
+      };
+    } catch (error) {
+      console.error('💥 Error parsing project data:', error);
+      return null;
+    }
+  }
+
+  async updateProject(projectId: string, newName: string, newDescription: string): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      const args = new Args()
+        .addString(projectId)
+        .addString(newName)
+        .addString(newDescription);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "updateProject",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Project update transaction result:", result);
+      return true;
+    } catch (error) {
+      console.error("Error updating project:", error);
+      throw new Error(`Failed to update project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async deleteProject(projectId: string): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      const args = new Args().addString(projectId);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "deleteProject",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Project delete transaction result:", result);
+      return true;
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      throw new Error(`Failed to delete project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getPollsByProject(projectId: string): Promise<ContractPoll[]> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      const args = new Args().addString(projectId);
+
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "getPollsByProject",
+        parameter: args.serialize(),
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      const pollEvents = events.filter(event => {
+        const data = event.data;
+        return data.includes('|') && data.includes('Poll ') && data.includes(':');
+      });
+
+      const polls: ContractPoll[] = [];
+      const processedIds = new Set<string>();
+
+      for (const event of pollEvents) {
+        try {
+          let pollDataStr = event.data;
+
+          if (pollDataStr.includes('Poll ') && pollDataStr.includes(':')) {
+            const colonIndex = pollDataStr.indexOf(':');
+            pollDataStr = pollDataStr.substring(colonIndex + 1).trim();
+          }
+
+          const poll = this.parsePollData(pollDataStr);
+          if (poll && !processedIds.has(poll.id)) {
+            polls.push(poll);
+            processedIds.add(poll.id);
+          }
+        } catch (parseError) {
+          console.log(`⚠️ Failed to parse poll event:`, parseError);
+          continue;
+        }
+      }
+
+      return polls;
+    } catch (error) {
+      console.error("Error fetching polls by project:", error);
+      return [];
     }
   }
 }
