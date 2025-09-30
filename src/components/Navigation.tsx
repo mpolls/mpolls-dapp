@@ -1,9 +1,14 @@
 import React from 'react';
 import { MassaLogo } from "@massalabs/react-ui-kit";
+import HomeIcon from '@mui/icons-material/Home';
+import PollIcon from '@mui/icons-material/Poll';
+import AddCircleIcon from '@mui/icons-material/AddCircle';
+import SettingsIcon from '@mui/icons-material/Settings';
+import FolderIcon from '@mui/icons-material/Folder';
 
 interface NavigationProps {
-  onNavigate: (page: 'home' | 'polls' | 'create' | 'admin') => void;
-  currentPage: 'home' | 'polls' | 'create' | 'admin';
+  onNavigate: (page: 'home' | 'polls' | 'create' | 'admin' | 'projects') => void;
+  currentPage: 'home' | 'polls' | 'create' | 'admin' | 'projects';
   onScrollToSection?: (sectionId: string) => void;
 }
 
@@ -61,35 +66,53 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, currentPage, onScro
       {/* Bottom Navigation */}
       <nav className="bottom-nav">
         <div className="bottom-nav-container">
-          <button 
+          <button
             className={`bottom-nav-item ${currentPage === 'home' ? 'active' : ''}`}
             onClick={() => onNavigate('home')}
           >
-            <div className="bottom-nav-icon">🏠</div>
+            <div className="bottom-nav-icon">
+              <HomeIcon sx={{ fontSize: 24 }} />
+            </div>
             <span className="bottom-nav-label">Home</span>
           </button>
-          
-          <button 
+
+          <button
             className={`bottom-nav-item ${currentPage === 'polls' ? 'active' : ''}`}
             onClick={() => onNavigate('polls')}
           >
-            <div className="bottom-nav-icon">📊</div>
+            <div className="bottom-nav-icon">
+              <PollIcon sx={{ fontSize: 24 }} />
+            </div>
             <span className="bottom-nav-label">Polls</span>
           </button>
-          
-          <button 
+
+          <button
+            className={`bottom-nav-item ${currentPage === 'projects' ? 'active' : ''}`}
+            onClick={() => onNavigate('projects')}
+          >
+            <div className="bottom-nav-icon">
+              <FolderIcon sx={{ fontSize: 24 }} />
+            </div>
+            <span className="bottom-nav-label">Projects</span>
+          </button>
+
+          <button
             className={`bottom-nav-item ${currentPage === 'create' ? 'active' : ''}`}
             onClick={() => onNavigate('create')}
           >
-            <div className="bottom-nav-icon">➕</div>
+            <div className="bottom-nav-icon">
+              <AddCircleIcon sx={{ fontSize: 24 }} />
+            </div>
             <span className="bottom-nav-label">Create</span>
           </button>
-          
-          <button 
+
+          <button
             className={`bottom-nav-item ${currentPage === 'admin' ? 'active' : ''}`}
             onClick={() => onNavigate('admin')}
           >
-            <div className="bottom-nav-icon">⚙️</div>
+            <div className="bottom-nav-icon">
+              <SettingsIcon sx={{ fontSize: 24 }} />
+            </div>
             <span className="bottom-nav-label">Admin</span>
           </button>
         </div>

@@ -6,6 +6,19 @@ import { pollsContract, ContractPoll } from "./utils/contractInteraction";
 import { parseBlockchainError, logError } from "./utils/errorHandling";
 import { useToast } from "./components/ToastContainer";
 import { formatTimeRemaining, getTimeUrgencyClass } from "./utils/timeFormat";
+import HowToVoteIcon from '@mui/icons-material/HowToVote';
+import TableChartIcon from '@mui/icons-material/TableChart';
+import ViewModuleIcon from '@mui/icons-material/ViewModule';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import LinkIcon from '@mui/icons-material/Link';
+import PlaceIcon from '@mui/icons-material/Place';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import PeopleIcon from '@mui/icons-material/People';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import ErrorIcon from '@mui/icons-material/Error';
 
 // Convert ContractPoll to display format
 interface Poll extends Omit<ContractPoll, 'id' | 'votes'> {
@@ -16,7 +29,7 @@ interface Poll extends Omit<ContractPoll, 'id' | 'votes'> {
   rewards: string;
 }
 
-type PageType = 'home' | 'polls' | 'create' | 'admin';
+type PageType = 'home' | 'polls' | 'create' | 'admin' | 'projects';
 
 interface PollsAppProps {
   initialView?: PageType;
@@ -50,6 +63,9 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
   // Auto-refresh state
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
+
+  // View mode state (beta table view or classic card view)
+  const [viewMode, setViewMode] = useState<'beta' | 'classic'>('beta');
 
   // Live countdown update
   const [, setTimeUpdateTrigger] = useState(0);
@@ -412,7 +428,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
         <header className="polls-header">
           <div className="header-content">
             <div className="header-left">
-              <h1>🗳️ Massa Polls</h1>
+              <h1><HowToVoteIcon sx={{ fontSize: 32, marginRight: 1, verticalAlign: 'middle' }} /> Massa Polls</h1>
               <p>Decentralized voting on the Massa blockchain</p>
             </div>
             <div className="header-right">
@@ -420,7 +436,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
               <div className="wallet-section">
                 {isWalletConnected ? (
                   <div className="wallet-connected">
-                    <span className="wallet-status">✅ Wallet Connected</span>
+                    <span className="wallet-status"><CheckCircleIcon sx={{ fontSize: 18, marginRight: 0.5, verticalAlign: 'middle' }} /> Wallet Connected</span>
                     {walletAddress && (
                       <span className="wallet-address">
                         {walletAddress.length > 20 ? 
@@ -436,7 +452,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                     onClick={connectWallet}
                     disabled={isConnectingWallet}
                   >
-                    {isConnectingWallet ? '🔄 Connecting...' : '🔗 Connect Wallet'}
+                    {isConnectingWallet ? <><RefreshIcon sx={{ fontSize: 18, marginRight: 0.5, verticalAlign: 'middle' }} /> Connecting...</> : <><LinkIcon sx={{ fontSize: 18, marginRight: 0.5, verticalAlign: 'middle' }} /> Connect Wallet</>}
                   </button>
                 )}
               </div>
@@ -446,15 +462,15 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                 rel="noopener noreferrer"
                 className="explorer-link"
               >
-                🔗 Massa Explorer
+                <LinkIcon sx={{ fontSize: 16, marginRight: 0.5, verticalAlign: 'middle' }} /> Massa Explorer
               </a>
-              <a 
+              <a
                 href={`https://explorer.massa.net/mainnet/address/${CONTRACT_CREATOR_ADDRESS}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="explorer-link-small"
               >
-                🔗
+                <LinkIcon sx={{ fontSize: 16 }} />
               </a>
             </div>
           </div>
@@ -462,7 +478,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
         
         <div className="contract-info-header">
           <div className="contract-details">
-            <span className="contract-label">📍 Contract:</span>
+            <span className="contract-label"><PlaceIcon sx={{ fontSize: 16, marginRight: 0.5, verticalAlign: 'middle' }} /> Contract:</span>
             <span className="contract-address">{pollsContract.getContractAddress()}</span>
             <a 
               href={pollsContract.getExplorerUrl()}
@@ -470,14 +486,14 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
               rel="noopener noreferrer"
               className="explorer-link-small"
             >
-              🔗
+              <LinkIcon sx={{ fontSize: 16 }} />
             </a>
           </div>
         </div>
 
       {selectedPoll ? (
         <div className="poll-detail">
-          <button 
+          <button
             className="back-btn"
             onClick={() => setSelectedPoll(null)}
           >
@@ -500,7 +516,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
               {/* Voting Status Messages */}
               {votingStatus.message && (
                 <div className={`voting-feedback voting-${votingStatus.type}`}>
-                  {votingStatus.isVoting && <span className="voting-spinner">🔄 </span>}
+                  {votingStatus.isVoting && <span className="voting-spinner"><RefreshIcon sx={{ fontSize: 16, marginRight: 0.5, verticalAlign: 'middle' }} /> </span>}
                   {votingStatus.message}
                 </div>
               )}
@@ -548,7 +564,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
           {/* Loading State */}
           {isLoadingPolls && (
             <div className="loading-state">
-              <h3>🔄 Loading Polls from Blockchain...</h3>
+              <h3><RefreshIcon sx={{ fontSize: 24, marginRight: 1, verticalAlign: 'middle' }} /> Loading Polls from Blockchain...</h3>
               <p>Fetching the latest polls from the Massa network. This may take a moment.</p>
             </div>
           )}
@@ -556,10 +572,10 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
           {/* Error State */}
           {pollsError && !isLoadingPolls && (
             <div className="error-state">
-              <h3>❌ Error Loading Polls</h3>
+              <h3><ErrorIcon sx={{ fontSize: 24, marginRight: 1, verticalAlign: 'middle' }} /> Error Loading Polls</h3>
               <p>{pollsError}</p>
               <button className="retry-btn" onClick={fetchPolls}>
-                🔄 Retry
+                <RefreshIcon sx={{ fontSize: 18, marginRight: 0.5, verticalAlign: 'middle' }} /> Retry
               </button>
             </div>
           )}
@@ -567,10 +583,10 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
           {/* Empty State */}
           {!isLoadingPolls && !pollsError && polls.length === 0 && (
             <div className="empty-state">
-              <h3>📊 No Polls Found</h3>
+              <h3><TableChartIcon sx={{ fontSize: 24, marginRight: 1, verticalAlign: 'middle' }} /> No Polls Found</h3>
               <p>No polls have been created on the blockchain yet. Be the first to create one!</p>
               <button className="create-first-poll-btn" onClick={() => handleNavigation('create')}>
-                🚀 Create First Poll
+                <RocketLaunchIcon sx={{ fontSize: 18, marginRight: 0.5, verticalAlign: 'middle' }} /> Create First Poll
               </button>
             </div>
           )}
@@ -580,7 +596,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
             <>
               <div className="polls-header-info">
                 <div className="polls-header-left">
-                  <h3>📊 Blockchain Polls</h3>
+                  <h3><TableChartIcon sx={{ fontSize: 22, marginRight: 1, verticalAlign: 'middle' }} /> Blockchain Polls</h3>
                   <p>Showing {polls.length} poll{polls.length !== 1 ? 's' : ''} from the Massa blockchain</p>
                   {lastRefreshTime && (
                     <small className="last-refresh">
@@ -589,6 +605,22 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                   )}
                 </div>
                 <div className="polls-header-right">
+                  <div className="view-mode-toggle">
+                    <button
+                      className={`view-mode-btn ${viewMode === 'beta' ? 'active' : ''}`}
+                      onClick={() => setViewMode('beta')}
+                      title="Table View (Beta)"
+                    >
+                      <TableChartIcon sx={{ fontSize: 18, marginRight: 0.5 }} /> Beta
+                    </button>
+                    <button
+                      className={`view-mode-btn ${viewMode === 'classic' ? 'active' : ''}`}
+                      onClick={() => setViewMode('classic')}
+                      title="Card View (Classic)"
+                    >
+                      <ViewModuleIcon sx={{ fontSize: 18, marginRight: 0.5 }} /> Classic
+                    </button>
+                  </div>
                   <label className="auto-refresh-toggle">
                     <input
                       type="checkbox"
@@ -598,49 +630,133 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                     <span>Auto-refresh (30s)</span>
                   </label>
                   <button className="refresh-polls-btn" onClick={fetchPolls}>
-                    🔄 Refresh
+                    <RefreshIcon sx={{ fontSize: 18, marginRight: 0.5, verticalAlign: 'middle' }} /> Refresh
                   </button>
                 </div>
               </div>
               
-              <div className="polls-grid">
-                {polls.map(poll => (
-                  <div key={poll.id} className={`poll-card ${!poll.isActive ? 'poll-inactive' : ''}`} onClick={() => setSelectedPoll(poll)}>
-                    <div className="poll-badge">
-                      <span className="blockchain-badge">⛓️ On-Chain</span>
-                      <span className="poll-id">#{poll.id}</span>
-                      <span className={`poll-status-badge ${poll.isActive ? 'active' : 'inactive'}`}>
-                        {poll.isActive ? '🟢 Active' : '🔴 Ended'}
-                      </span>
-                    </div>
-                    
-                    <h3>{poll.title}</h3>
-                    <p className="poll-description">{poll.description}</p>
-                    
-                    <div className="poll-preview">
-                      <div className="poll-stats">
-                        <span className="votes">{poll.totalVotes} votes</span>
-                        <span className={`time-left ${getTimeUrgencyClass(poll.endTime, poll.isActive)}`}>
-                          {formatTimeRemaining(poll.endTime, poll.isActive)}
-                        </span>
+              {/* Beta View - Table Layout */}
+              {viewMode === 'beta' && (
+                <div className="polls-table-container">
+                  <table className="polls-table">
+                    <thead>
+                      <tr>
+                        <th className="th-poll">POLL</th>
+                        <th className="th-status">STATUS</th>
+                        <th className="th-votes">VOTES</th>
+                        <th className="th-rewards">REWARDS</th>
+                        <th className="th-creator">CREATOR</th>
+                        <th className="th-time">TIME REMAINING</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {polls.map(poll => (
+                        <tr
+                          key={poll.id}
+                          className={`poll-row ${!poll.isActive ? 'poll-inactive' : ''}`}
+                          onClick={() => setSelectedPoll(poll)}
+                        >
+                          <td className="td-poll">
+                            <div className="poll-cell">
+                              <div className="poll-icon">
+                                <HowToVoteIcon sx={{ fontSize: 24 }} />
+                              </div>
+                              <div className="poll-info">
+                                <div className="poll-title-row">
+                                  <span className="poll-title">{poll.title}</span>
+                                  <span className="poll-id">#{poll.id}</span>
+                                </div>
+                                <span className="poll-description">
+                                  {poll.description.length > 60
+                                    ? `${poll.description.substring(0, 60)}...`
+                                    : poll.description
+                                  }
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="td-status">
+                            <span className={`status-badge ${poll.isActive ? 'active' : 'inactive'}`}>
+                              {poll.isActive ? 'Active' : 'Ended'}
+                            </span>
+                          </td>
+                          <td className="td-votes">
+                            <span className="votes-count">{poll.totalVotes}</span>
+                          </td>
+                          <td className="td-rewards">
+                            <span className="rewards-amount">{poll.rewards}</span>
+                          </td>
+                          <td className="td-creator">
+                            <span className="creator-address">
+                              {poll.creator.slice(0, 6)}...{poll.creator.slice(-4)}
+                            </span>
+                          </td>
+                          <td className="td-time">
+                            <span className={`time-remaining ${getTimeUrgencyClass(poll.endTime, poll.isActive)}`}>
+                              {formatTimeRemaining(poll.endTime, poll.isActive)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Classic View - Card Layout */}
+              {viewMode === 'classic' && (
+                <div className="polls-grid-classic">
+                  {polls.map(poll => (
+                    <div
+                      key={poll.id}
+                      className={`poll-card-classic ${!poll.isActive ? 'poll-inactive' : ''}`}
+                      onClick={() => setSelectedPoll(poll)}
+                    >
+                      <div className="poll-card-header">
+                        <div className="poll-card-title-row">
+                          <h3>{poll.title}</h3>
+                          <span className={`status-pill ${poll.isActive ? 'active' : 'ended'}`}>
+                            {poll.isActive ? 'Active' : 'Ended'}
+                          </span>
+                        </div>
+                        <p className="poll-card-description">{poll.description}</p>
                       </div>
-                      <div className="poll-rewards">
-                        🏆 {poll.rewards}
+
+                      <div className="poll-card-stats">
+                        <div className="stat-box">
+                          <span className="stat-icon"><PeopleIcon sx={{ fontSize: 28 }} /></span>
+                          <div className="stat-details">
+                            <span className="stat-value">{poll.totalVotes}</span>
+                            <span className="stat-label">responses</span>
+                          </div>
+                        </div>
+                        <div className="stat-box">
+                          <span className="stat-icon"><CalendarTodayIcon sx={{ fontSize: 28 }} /></span>
+                          <div className="stat-details">
+                            <span className="stat-value">
+                              {poll.isActive ? formatTimeRemaining(poll.endTime, poll.isActive) : 'Ended'}
+                            </span>
+                            <span className="stat-label">
+                              {poll.isActive ? new Date(poll.endTime).toLocaleDateString() : new Date(poll.endTime).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="poll-card-footer">
+                        <button className="poll-action-btn">
+                          {poll.isActive ? 'View Results' : 'Edit & Publish'}
+                        </button>
+                        <div className="poll-card-menu"><MoreVertIcon sx={{ fontSize: 20 }} /></div>
+                      </div>
+
+                      <div className="poll-card-meta">
+                        <span className="poll-created">Created {new Date(poll.endTime - (poll.isActive ? 7 * 24 * 60 * 60 * 1000 : 0)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                       </div>
                     </div>
-                    
-                    <div className="poll-creator">
-                      Created by {poll.creator}
-                    </div>
-                    
-                    {!poll.isActive && (
-                      <div className="poll-inactive-overlay">
-                        <span>Voting Ended</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>

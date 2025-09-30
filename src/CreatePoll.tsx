@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react";
 import { pollsContract, PollCreationParams } from "./utils/contractInteraction";
 import { parseBlockchainError, logError } from "./utils/errorHandling";
+import PlaceIcon from '@mui/icons-material/Place';
+import LinkIcon from '@mui/icons-material/Link';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 
 interface CreatePollProps {
   onBack: () => void;
@@ -176,7 +180,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
           
           {/* Contract Address Display */}
           <div className="contract-info">
-            <h3>📍 Contract Information</h3>
+            <h3><PlaceIcon sx={{ fontSize: 20, marginRight: 0.5, verticalAlign: 'middle' }} /> Contract Information</h3>
             <div className="contract-address">
               <strong>Address:</strong> {pollsContract.getContractAddress()}
             </div>
@@ -189,7 +193,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
               rel="noopener noreferrer"
               className="explorer-link"
             >
-              🔗 View on Explorer
+              <LinkIcon sx={{ fontSize: 16, marginRight: 0.5, verticalAlign: 'middle' }} /> View on Explorer
             </a>
           </div>
 
@@ -214,7 +218,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
               </div>
             ) : (
               <div className="wallet-connected">
-                <p>✅ Wallet Connected</p>
+                <p><CheckCircleIcon sx={{ fontSize: 20, marginRight: 0.5, verticalAlign: 'middle' }} /> Wallet Connected</p>
                 <div className="wallet-info">
                   <div className="wallet-name">
                     <strong>Wallet:</strong> {walletName || "Unknown"}
@@ -423,7 +427,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
 
             {/* Fee Split Info */}
             <div className="fee-info">
-              <h3>💰 Revenue Split</h3>
+              <h3><AttachMoneyIcon sx={{ fontSize: 22, marginRight: 0.5, verticalAlign: 'middle' }} /> Revenue Split</h3>
               <p>You keep <strong>70%</strong> of all fees collected. Massa Polls takes 30% to maintain the platform.</p>
             </div>
 

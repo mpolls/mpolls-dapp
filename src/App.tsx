@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
 import { MassaLogo } from "@massalabs/react-ui-kit";
 import PollsApp from './PollsApp';
+import ProjectsPage from './ProjectsPage';
 import Navigation from './components/Navigation';
 import { pollsContract, ContractPoll } from './utils/contractInteraction';
 import { ToastProvider } from './components/ToastContainer';
+import HowToVoteIcon from '@mui/icons-material/HowToVote';
+import CreateIcon from '@mui/icons-material/Create';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import TableChartIcon from '@mui/icons-material/TableChart';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import './App.css';
 
-type PageType = 'home' | 'polls' | 'create' | 'admin';
+type PageType = 'home' | 'polls' | 'create' | 'admin' | 'projects';
 
 function App() {
   const [currentText, setCurrentText] = useState(0);
@@ -31,12 +37,15 @@ function App() {
       try {
         console.log('🏠 App.tsx: Fetching featured polls from contract...');
         const contractPolls = await pollsContract.getAllPolls();
-        
-        // Take the first 8 polls for featured section (or all if less than 8)
-        const featured = contractPolls.slice(0, 8);
+
+        // Filter only active polls that users can vote on
+        const activePolls = contractPolls.filter(poll => poll.isActive);
+
+        // Take the first 8 active polls for featured section (or all if less than 8)
+        const featured = activePolls.slice(0, 8);
         setFeaturedPolls(featured);
-        
-        console.log(`🏠 App.tsx: Successfully loaded ${featured.length} featured polls`);
+
+        console.log(`🏠 App.tsx: Successfully loaded ${featured.length} active featured polls (out of ${contractPolls.length} total polls)`);
       } catch (error) {
         console.error('🏠 App.tsx: Failed to fetch featured polls:', error);
         setFeaturedPolls([]);
@@ -62,6 +71,18 @@ function App() {
   };
 
   // Render different pages based on current page
+  if (currentPage === 'projects') {
+    return (
+      <ToastProvider>
+        <Navigation
+          onNavigate={handleNavigation}
+          currentPage={currentPage}
+        />
+        <ProjectsPage onBack={() => handleNavigation('home')} />
+      </ToastProvider>
+    );
+  }
+
   if (currentPage === 'polls' || currentPage === 'create' || currentPage === 'admin') {
     return (
       <ToastProvider>
@@ -96,15 +117,47 @@ function App() {
         </div>
       </header>
 
+      <section id="role-selection" className="role-selection">
+        <h2>Choose Your Path</h2>
+        <div className="roles-grid">
+          <div className="role-card" onClick={() => handleNavigation('polls')}>
+            <div className="role-icon">
+              <HowToVoteIcon sx={{ fontSize: 80 }} />
+            </div>
+            <h3>Participant</h3>
+            <p>Browse and vote on active polls</p>
+            <button className="role-btn">Get Started</button>
+          </div>
+
+          <div className="role-card" onClick={() => handleNavigation('create')}>
+            <div className="role-icon">
+              <CreateIcon sx={{ fontSize: 80 }} />
+            </div>
+            <h3>Creator</h3>
+            <p>Browse projects, create polls and contests</p>
+            <button className="role-btn">Start Creating</button>
+          </div>
+
+          <div className="role-card" onClick={() => handleNavigation('admin')}>
+            <div className="role-icon">
+              <AdminPanelSettingsIcon sx={{ fontSize: 80 }} />
+            </div>
+            <h3>Administrator</h3>
+            <p>Administer projects and polls</p>
+            <button className="role-btn">Manage</button>
+          </div>
+        </div>
+      </section>
+
       <section id="featured-polls" className="featured-polls">
         <h2>Featured Polls</h2>
         {isLoadingPolls ? (
           <div className="loading-state">
-            <p>🔄 Loading polls from blockchain...</p>
+            <p><RefreshIcon sx={{ fontSize: 20, marginRight: 0.5, verticalAlign: 'middle' }} /> Loading polls from blockchain...</p>
           </div>
         ) : featuredPolls.length === 0 ? (
           <div className="empty-state">
-            <p>📊 No polls found on the blockchain yet.</p>
+            <p><TableChartIcon sx={{ fontSize: 20, marginRight: 0.5, verticalAlign: 'middle' }} /> No polls found on the blockchain yet.</p>
             <button className="create-poll-btn" onClick={() => handleNavigation('create')}>
               Create First Poll
             </button>
