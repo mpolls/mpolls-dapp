@@ -1,0 +1,388 @@
+.token-page {
+  min-height: 100vh;
+  padding: 2rem 1rem;
+  padding-bottom: 100px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.token-container {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.back-button {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-bottom: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.back-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateX(-5px);
+}
+
+.token-header {
+  text-align: center;
+  color: white;
+  margin-bottom: 2rem;
+}
+
+.token-header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.token-subtitle {
+  font-size: 1.1rem;
+  opacity: 0.9;
+}
+
+.card {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.card h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.section-header h2 {
+  margin-bottom: 0;
+}
+
+.refresh-btn {
+  background: #667eea;
+  border: none;
+  color: white;
+  padding: 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: #5568d3;
+  transform: rotate(180deg);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.section-description {
+  color: #666;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+}
+
+/* Wallet Section */
+.wallet-section {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.wallet-section h2 {
+  color: white;
+}
+
+.connect-wallet-btn {
+  width: 100%;
+  padding: 1rem;
+  background: white;
+  color: #667eea;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.connect-wallet-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.connect-wallet-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.wallet-info {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-row .label {
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.info-row .value {
+  font-family: 'Monaco', 'Courier New', monospace;
+  opacity: 0.95;
+}
+
+.address-value {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.copy-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 0.25rem;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.copy-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.minter-badge {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background: rgba(76, 175, 80, 0.3);
+  border: 2px solid rgba(76, 175, 80, 0.5);
+  border-radius: 8px;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* Token Info Section */
+.token-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.stat-item {
+  padding: 1rem;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+.stat-value {
+  display: block;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #333;
+}
+
+.stat-value.highlight {
+  color: #667eea;
+  font-size: 1.5rem;
+}
+
+/* Form Groups */
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-group input:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+/* Action Buttons */
+.action-btn {
+  width: 100%;
+  padding: 1rem;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: white;
+}
+
+.action-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mint-btn {
+  background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+}
+
+.transfer-btn {
+  background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+}
+
+.burn-btn {
+  background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+}
+
+.grant-btn {
+  background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+}
+
+/* Contract Info */
+.contract-info {
+  background: #f9f9f9;
+  border: 2px solid #e0e0e0;
+}
+
+.contract-info h3 {
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.contract-info .info-row {
+  border-bottom-color: #e0e0e0;
+}
+
+.contract-info .label {
+  color: #666;
+}
+
+.contract-info .value {
+  color: #333;
+}
+
+.contract-info .copy-btn {
+  background: #667eea;
+  color: white;
+}
+
+.contract-info .copy-btn:hover {
+  background: #5568d3;
+}
+
+/* Error Message */
+.error-message {
+  background: white;
+  border-radius: 16px;
+  padding: 3rem;
+  text-align: center;
+  color: #f44336;
+}
+
+.error-message h2 {
+  margin-bottom: 1rem;
+}
+
+.error-message p {
+  color: #666;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .token-page {
+    padding: 1rem 0.5rem;
+  }
+
+  .card {
+    padding: 1.5rem;
+  }
+
+  .token-header h1 {
+    font-size: 2rem;
+  }
+
+  .token-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .address-value {
+    max-width: 50%;
+    font-size: 0.8rem;
+  }
+
+  .info-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .address-value {
+    max-width: 100%;
+  }
+}

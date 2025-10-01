@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { MassaLogo } from "@massalabs/react-ui-kit";
 import PollsApp from './PollsApp';
 import ProjectsPage from './ProjectsPage';
+import TokenPage from './TokenPage';
 import Navigation from './components/Navigation';
 import { pollsContract, ContractPoll } from './utils/contractInteraction';
 import { ToastProvider } from './components/ToastContainer';
@@ -12,7 +13,7 @@ import TableChartIcon from '@mui/icons-material/TableChart';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import './App.css';
 
-type PageType = 'home' | 'polls' | 'create' | 'admin' | 'projects';
+type PageType = 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token';
 
 function App() {
   const [currentText, setCurrentText] = useState(0);
@@ -71,6 +72,18 @@ function App() {
   };
 
   // Render different pages based on current page
+  if (currentPage === 'token') {
+    return (
+      <ToastProvider>
+        <Navigation
+          onNavigate={handleNavigation}
+          currentPage={currentPage}
+        />
+        <TokenPage onBack={() => handleNavigation('home')} />
+      </ToastProvider>
+    );
+  }
+
   if (currentPage === 'projects') {
     return (
       <ToastProvider>

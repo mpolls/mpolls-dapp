@@ -399,18 +399,16 @@ export class PollsContract {
 
       // Determine if poll is active
       // NOTE: Contract uses Context.timestamp() which returns SECONDS, not milliseconds
-      // We need to convert our millisecond timestamps to seconds for comparison
-      const currentTimeMs = Date.now();
-      const currentTimeSec = Math.floor(currentTimeMs / 1000);
-      const endTimeSec = Math.floor(endTime / 1000);
-      const isActive = status === 0 && currentTimeSec < endTimeSec;
+      // startTime and endTime from contract are in seconds, so we need to convert for display
+      const currentTimeSec = Math.floor(Date.now() / 1000);
+      const isActive = status === 0 && currentTimeSec >= startTime && currentTimeSec < endTime;
       
       console.log(`⏰ Timestamp Analysis:`);
-      console.log(`   Current Time (ms): ${currentTimeMs}`);
       console.log(`   Current Time (sec): ${currentTimeSec}`);
-      console.log(`   End Time (ms): ${endTime}`);
-      console.log(`   End Time (sec): ${endTimeSec}`);
-      console.log(`   Time comparison (sec): ${currentTimeSec} < ${endTimeSec} = ${currentTimeSec < endTimeSec}`);
+      console.log(`   Start Time (sec): ${startTime}`);
+      console.log(`   End Time (sec): ${endTime}`);
+      console.log(`   Status: ${status}`);
+      console.log(`   Time comparison: ${currentTimeSec} >= ${startTime} && ${currentTimeSec} < ${endTime} = ${currentTimeSec >= startTime && currentTimeSec < endTime}`);
 
       console.log(`📊 Successfully parsed poll:`);
       console.log(`   ID: ${id}`);
@@ -418,12 +416,9 @@ export class PollsContract {
       console.log(`   Description: "${description}"`);
       console.log(`   Options: [${options.map(opt => `"${opt}"`).join(', ')}]`);
       console.log(`   Creator: ${creator}`);
-      console.log(`   Start Time: ${new Date(startTime).toLocaleString()} (${startTime})`);
-      console.log(`   End Time: ${new Date(endTime).toLocaleString()} (${endTime})`);
-      console.log(`   Current Time: ${new Date(currentTimeMs).toLocaleString()} (${currentTimeMs})`);
-      console.log(`   Raw Status: ${status}`);
-      console.log(`   Status Check: status === 0 ? ${status === 0}`);
-      console.log(`   Time Check: currentTimeSec < endTimeSec ? ${currentTimeSec < endTimeSec}`);
+      console.log(`   Start Time: ${new Date(startTime * 1000).toLocaleString()} (${startTime} sec)`);
+      console.log(`   End Time: ${new Date(endTime * 1000).toLocaleString()} (${endTime} sec)`);
+      console.log(`   Current Time: ${new Date(currentTimeSec * 1000).toLocaleString()} (${currentTimeSec} sec)`);
       console.log(`   Final Active Status: ${isActive ? 'Active' : 'Inactive'}`);
       console.log(`   Votes: [${votes.join(', ')}]`);
 
@@ -435,8 +430,8 @@ export class PollsContract {
         creator,
         votes,
         isActive,
-        createdAt: startTime,
-        endTime: endTime,
+        createdAt: startTime * 1000, // Convert to milliseconds for JavaScript Date
+        endTime: endTime * 1000, // Convert to milliseconds for JavaScript Date
         status: isActive ? 'active' as const : 'ended' as const
       };
     } catch (error) {
