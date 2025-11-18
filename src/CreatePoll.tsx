@@ -17,13 +17,17 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
     description: "",
     options: ["", ""],
     duration: 7, // days
-    entryFee: 0,
-    votingFee: 0,
-    rewardPool: 0,
     allowList: "",
     contestType: "open" as "open" | "allowlist",
     viewType: "text" as "text" | "gallery",
-    projectId: 0 // 0 means no project assigned
+    projectId: 0, // 0 means no project assigned
+    // New economics fields
+    fundingType: "self" as "self" | "community" | "treasury",
+    distributionMode: "equal" as "equal" | "fixed" | "weighted",
+    distributionType: "manual-pull" as "manual-pull" | "manual-push" | "autonomous",
+    rewardPool: 0, // Initial reward pool amount
+    fixedRewardAmount: 0, // For fixed reward mode
+    fundingGoal: 0 // For community-funded polls
   });
 
   const [isCreating, setIsCreating] = useState(false);
@@ -144,12 +148,23 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
       const durationInSeconds = formData.duration * 24 * 60 * 60; // Convert days to seconds
       const filteredOptions = formData.options.filter(opt => opt.trim());
 
+      // Map frontend values to contract enum values
+      const fundingTypeMap = { "self": 0, "community": 1, "treasury": 2 };
+      const distributionModeMap = { "equal": 0, "fixed": 1, "weighted": 2 };
+      const distributionTypeMap = { "manual-pull": 0, "manual-push": 1, "autonomous": 2 };
+
       const pollParams: PollCreationParams = {
         title: formData.title,
         description: formData.description,
         options: filteredOptions,
         durationInSeconds,
-        projectId: formData.projectId > 0 ? formData.projectId : undefined
+        projectId: formData.projectId > 0 ? formData.projectId : undefined,
+        fundingType: fundingTypeMap[formData.fundingType],
+        distributionMode: distributionModeMap[formData.distributionMode],
+        distributionType: distributionTypeMap[formData.distributionType],
+        fixedRewardAmount: formData.fixedRewardAmount,
+        fundingGoal: formData.fundingGoal,
+        rewardPoolAmount: formData.rewardPool // Initial funding for self-funded polls
       };
       console.log("🚀 Creating poll with parameters:", pollParams);
 
@@ -164,13 +179,16 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
         description: "",
         options: ["", ""],
         duration: 7,
-        entryFee: 0,
-        votingFee: 0,
-        rewardPool: 0,
         allowList: "",
         contestType: "open",
         viewType: "text",
-        projectId: 0
+        projectId: 0,
+        fundingType: "self",
+        distributionMode: "equal",
+        distributionType: "manual-pull",
+        rewardPool: 0,
+        fixedRewardAmount: 0,
+        fundingGoal: 0
       });
 
       // Redirect to polls list after a short delay to show the success message
@@ -416,10 +434,10 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
               )}
             </div>
 
-            {/* Duration & Fees */}
+            {/* Duration & Economics */}
             <div className="form-section">
               <h2>Duration & Economics</h2>
-              
+
               <div className="form-group">
                 <label htmlFor="duration">Poll Duration (days) *</label>
                 <input
@@ -433,47 +451,172 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="entryFee">Entry Fee (MASSA)</label>
-                <input
-                  type="number"
-                  id="entryFee"
-                  value={formData.entryFee}
-                  onChange={(e) => setFormData(prev => ({ ...prev, entryFee: parseFloat(e.target.value) || 0 }))}
-                  min="0"
-                  step="0.001"
-                />
+                <label>Funding Type</label>
+                <div className="radio-group">
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="fundingType"
+                      value="self"
+                      checked={formData.fundingType === "self"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, fundingType: e.target.value as "self" | "community" | "treasury" }))}
+                    />
+                    <span>Self-Funded</span>
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="fundingType"
+                      value="community"
+                      checked={formData.fundingType === "community"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, fundingType: e.target.value as "self" | "community" | "treasury" }))}
+                    />
+                    <span>Community-Funded</span>
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="fundingType"
+                      value="treasury"
+                      checked={formData.fundingType === "treasury"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, fundingType: e.target.value as "self" | "community" | "treasury" }))}
+                    />
+                    <span>Treasury-Funded</span>
+                  </label>
+                </div>
+                <small>
+                  {formData.fundingType === "self" && "You can fund the poll after creation or during the poll lifetime"}
+                  {formData.fundingType === "community" && "Anyone can contribute funds to this poll before it ends"}
+                  {formData.fundingType === "treasury" && "Requires admin approval before poll can be funded"}
+                </small>
               </div>
+
+              {formData.fundingType === "self" && (
+                <div className="form-group">
+                  <label htmlFor="rewardPool">Initial Reward Pool (MASSA)</label>
+                  <input
+                    type="number"
+                    id="rewardPool"
+                    value={formData.rewardPool}
+                    onChange={(e) => setFormData(prev => ({ ...prev, rewardPool: parseFloat(e.target.value) || 0 }))}
+                    min="0"
+                    step="0.001"
+                  />
+                  <small>Optional: Add funds now or fund later</small>
+                </div>
+              )}
+
+              {formData.fundingType === "community" && (
+                <div className="form-group">
+                  <label htmlFor="fundingGoal">Funding Goal (MASSA)</label>
+                  <input
+                    type="number"
+                    id="fundingGoal"
+                    value={formData.fundingGoal}
+                    onChange={(e) => setFormData(prev => ({ ...prev, fundingGoal: parseFloat(e.target.value) || 0 }))}
+                    min="0"
+                    step="0.001"
+                  />
+                  <small>Target amount for community contributions</small>
+                </div>
+              )}
 
               <div className="form-group">
-                <label htmlFor="votingFee">Voting Fee (MASSA)</label>
-                <input
-                  type="number"
-                  id="votingFee"
-                  value={formData.votingFee}
-                  onChange={(e) => setFormData(prev => ({ ...prev, votingFee: parseFloat(e.target.value) || 0 }))}
-                  min="0"
-                  step="0.001"
-                />
+                <label>Distribution Mode</label>
+                <div className="radio-group">
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="distributionMode"
+                      value="equal"
+                      checked={formData.distributionMode === "equal"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, distributionMode: e.target.value as "equal" | "fixed" | "weighted" }))}
+                    />
+                    <span>Equal Split</span>
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="distributionMode"
+                      value="fixed"
+                      checked={formData.distributionMode === "fixed"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, distributionMode: e.target.value as "equal" | "fixed" | "weighted" }))}
+                    />
+                    <span>Fixed Reward</span>
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="distributionMode"
+                      value="weighted"
+                      checked={formData.distributionMode === "weighted"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, distributionMode: e.target.value as "equal" | "fixed" | "weighted" }))}
+                    />
+                    <span>Weighted Quality</span>
+                  </label>
+                </div>
+                <small>
+                  {formData.distributionMode === "equal" && "Reward pool split equally among all voters"}
+                  {formData.distributionMode === "fixed" && "Fixed amount per voter until pool depletes"}
+                  {formData.distributionMode === "weighted" && "Weighted by response quality (for surveys)"}
+                </small>
               </div>
+
+              {formData.distributionMode === "fixed" && (
+                <div className="form-group">
+                  <label htmlFor="fixedRewardAmount">Fixed Reward per Voter (MASSA)</label>
+                  <input
+                    type="number"
+                    id="fixedRewardAmount"
+                    value={formData.fixedRewardAmount}
+                    onChange={(e) => setFormData(prev => ({ ...prev, fixedRewardAmount: parseFloat(e.target.value) || 0 }))}
+                    min="0"
+                    step="0.001"
+                  />
+                  <small>Amount each voter receives (first-come, first-served)</small>
+                </div>
+              )}
 
               <div className="form-group">
-                <label htmlFor="rewardPool">Initial Reward Pool (MASSA)</label>
-                <input
-                  type="number"
-                  id="rewardPool"
-                  value={formData.rewardPool}
-                  onChange={(e) => setFormData(prev => ({ ...prev, rewardPool: parseFloat(e.target.value) || 0 }))}
-                  min="0"
-                  step="0.001"
-                />
-                <small>Optional: Add your own funds to the reward pool</small>
+                <label>Distribution Type</label>
+                <div className="radio-group">
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="distributionType"
+                      value="manual-pull"
+                      checked={formData.distributionType === "manual-pull"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, distributionType: e.target.value as "manual-pull" | "manual-push" | "autonomous" }))}
+                    />
+                    <span>Manual Pull</span>
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="distributionType"
+                      value="manual-push"
+                      checked={formData.distributionType === "manual-push"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, distributionType: e.target.value as "manual-pull" | "manual-push" | "autonomous" }))}
+                    />
+                    <span>Manual Push</span>
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="distributionType"
+                      value="autonomous"
+                      checked={formData.distributionType === "autonomous"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, distributionType: e.target.value as "manual-pull" | "manual-push" | "autonomous" }))}
+                    />
+                    <span>Autonomous</span>
+                  </label>
+                </div>
+                <small>
+                  {formData.distributionType === "manual-pull" && "Voters claim their rewards after poll ends"}
+                  {formData.distributionType === "manual-push" && "You trigger reward distribution to all voters"}
+                  {formData.distributionType === "autonomous" && "Automatic distribution by smart contract when poll ends"}
+                </small>
               </div>
-            </div>
-
-            {/* Fee Split Info */}
-            <div className="fee-info">
-              <h3><AttachMoneyIcon sx={{ fontSize: 22, marginRight: 0.5, verticalAlign: 'middle' }} /> Revenue Split</h3>
-              <p>You keep <strong>70%</strong> of all fees collected. Massa Polls takes 30% to maintain the platform.</p>
             </div>
 
             {/* Submit */}

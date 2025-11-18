@@ -14,6 +14,13 @@ export interface PollCreationParams {
   options: string[];
   durationInSeconds: number;
   projectId?: number; // Optional project assignment
+  // New economics parameters
+  fundingType: number; // 0=SELF_FUNDED, 1=COMMUNITY_FUNDED, 2=TREASURY_FUNDED
+  distributionMode: number; // 0=EQUAL_SPLIT, 1=FIXED_REWARD, 2=WEIGHTED_QUALITY
+  distributionType: number; // 0=MANUAL_PULL, 1=MANUAL_PUSH, 2=AUTONOMOUS
+  fixedRewardAmount: number; // Amount per voter (if FIXED_REWARD mode)
+  fundingGoal: number; // Target amount for community-funded polls
+  rewardPoolAmount: number; // Initial funding for self-funded polls
 }
 
 export interface ProjectCreationParams {
@@ -42,6 +49,15 @@ export interface ContractPoll {
   endTime: number;
   status: 'active' | 'closed' | 'ended';
   projectId?: number; // Optional project assignment
+  // New economics fields
+  rewardPool: number; // Current reward pool in nanoMASSA
+  fundingType: number; // 0=SELF_FUNDED, 1=COMMUNITY_FUNDED, 2=TREASURY_FUNDED
+  distributionMode: number; // 0=EQUAL_SPLIT, 1=FIXED_REWARD, 2=WEIGHTED_QUALITY
+  distributionType: number; // 0=MANUAL_PULL, 1=MANUAL_PUSH, 2=AUTONOMOUS
+  fixedRewardAmount: number; // Amount per voter (if FIXED_REWARD mode)
+  fundingGoal: number; // Target amount for community-funded polls
+  treasuryApproved: boolean; // Approval status for treasury-funded polls
+  rewardsDistributed: boolean; // Whether rewards have been distributed
 }
 
 export class PollsContract {
@@ -148,7 +164,7 @@ export class PollsContract {
         explorer: `https://buildnet-explorer.massa.net/address/${this.contractAddress}`
       });
 
-      // Use the exact same argument structure as the working create-poll.js
+      // Build arguments with new economics parameters
       const args = new Args()
         .addString(params.title)
         .addString(params.description)
@@ -164,14 +180,34 @@ export class PollsContract {
       // Add optional projectId (0 means no project)
       if (params.projectId && params.projectId > 0) {
         args.addU64(BigInt(params.projectId));
+      } else {
+        args.addU64(BigInt(0));
       }
 
-      console.log("📦 Prepared arguments (matching working implementation):", {
+      // Add new economics parameters
+      args.addU8(params.fundingType);
+      args.addU8(params.distributionMode);
+      args.addU8(params.distributionType);
+
+      // Convert MASSA to nanoMASSA (1 MASSA = 10^9 nanoMASSA)
+      const fixedRewardInNano = BigInt(Math.floor(params.fixedRewardAmount * 1e9));
+      const fundingGoalInNano = BigInt(Math.floor(params.fundingGoal * 1e9));
+
+      args.addU64(fixedRewardInNano);
+      args.addU64(fundingGoalInNano);
+
+      console.log("📦 Prepared arguments with economics:", {
         title: params.title,
         description: params.description,
         optionCount: params.options.length,
         options: params.options,
-        duration: `${params.durationInSeconds} seconds`
+        duration: `${params.durationInSeconds} seconds`,
+        fundingType: params.fundingType,
+        distributionMode: params.distributionMode,
+        distributionType: params.distributionType,
+        fixedRewardAmount: params.fixedRewardAmount,
+        fundingGoal: params.fundingGoal,
+        rewardPoolAmount: params.rewardPoolAmount
       });
 
       // Make the actual blockchain transaction using wallet provider
@@ -180,11 +216,14 @@ export class PollsContract {
       console.log("   Function:", "createPoll");
       console.log("   Fee:", "0.01 MASSA");
       
+      // Convert reward pool amount to nanoMASSA and send with transaction
+      const rewardPoolInNano = BigInt(Math.floor(params.rewardPoolAmount * 1e9));
+
       const result = await this.account.callSC({
         target: this.contractAddress,
         func: "createPoll",
         parameter: args.serialize(),
-        coins: 0n,
+        coins: rewardPoolInNano, // Send initial funding with poll creation
         fee: Mas.fromString('0.01'), // Use same fee format as working implementation
       });
 
@@ -773,6 +812,207 @@ export class PollsContract {
     } catch (error) {
       console.error("Error funding contract:", error);
       throw new Error(`Failed to fund contract: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // ================= POLL FUNDING & REWARD METHODS =================
+
+  async fundPoll(pollId: string, amountInMassa: number): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("💰 Funding poll with parameters:", {
+        pollId,
+        amount: `${amountInMassa} MASSA`,
+        contractAddress: this.contractAddress
+      });
+
+      // Convert MASSA to nanoMASSA
+      const amountInNano = BigInt(Math.floor(amountInMassa * 1e9));
+
+      const args = new Args().addString(pollId);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "fundPoll",
+        parameter: args.serialize(),
+        coins: amountInNano, // Send funds with transaction
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("💸 Poll funding transaction result:", result);
+      return true;
+    } catch (error) {
+      console.error("Error funding poll:", error);
+      throw new Error(`Failed to fund poll: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async claimReward(pollId: string): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("🎁 Claiming reward from poll:", pollId);
+
+      const args = new Args().addString(pollId);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "claimReward",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Reward claim transaction successful!", result);
+      return true;
+    } catch (error) {
+      console.error("Error claiming reward:", error);
+      throw new Error(`Failed to claim reward: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async distributeRewards(pollId: string): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("📤 Distributing rewards for poll:", pollId);
+
+      const args = new Args().addString(pollId);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "distributeRewards",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Reward distribution transaction successful!", result);
+      return true;
+    } catch (error) {
+      console.error("Error distributing rewards:", error);
+      throw new Error(`Failed to distribute rewards: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getPoolBalance(pollId: string): Promise<number> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      const args = new Args().addString(pollId);
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "getPoolBalance",
+        parameter: args.serialize(),
+      });
+
+      // Get events to parse the balance
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      const balanceEvents = events.filter(event =>
+        event.data.includes(`Poll ${pollId} reward pool balance:`)
+      );
+
+      if (balanceEvents.length > 0) {
+        const latestEvent = balanceEvents[balanceEvents.length - 1];
+        const match = latestEvent.data.match(/balance: (\d+) nanoMASSA/);
+        if (match) {
+          const balanceInNano = parseFloat(match[1]);
+          return balanceInNano / 1e9; // Convert to MASSA
+        }
+      }
+
+      return 0;
+    } catch (error) {
+      console.error("Error getting pool balance:", error);
+      return 0;
+    }
+  }
+
+  async getContribution(pollId: string, contributor: string): Promise<number> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      const args = new Args()
+        .addString(pollId)
+        .addString(contributor);
+
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "getContribution",
+        parameter: args.serialize(),
+      });
+
+      // Get events to parse the contribution
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      const contributionEvents = events.filter(event =>
+        event.data.includes(`Contributor ${contributor} contributed`) &&
+        event.data.includes(`to poll ${pollId}`)
+      );
+
+      if (contributionEvents.length > 0) {
+        const latestEvent = contributionEvents[contributionEvents.length - 1];
+        const match = latestEvent.data.match(/contributed (\d+) nanoMASSA/);
+        if (match) {
+          const contributionInNano = parseFloat(match[1]);
+          return contributionInNano / 1e9; // Convert to MASSA
+        }
+      }
+
+      return 0;
+    } catch (error) {
+      console.error("Error getting contribution:", error);
+      return 0;
+    }
+  }
+
+  async hasClaimed(pollId: string, voterAddress: string): Promise<boolean> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      const args = new Args()
+        .addString(pollId)
+        .addString(voterAddress);
+
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "hasClaimed",
+        parameter: args.serialize(),
+      });
+
+      // Get events to check claimed status
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      const claimedEvents = events.filter(event =>
+        event.data.includes(`Voter ${voterAddress} has claimed reward for poll ${pollId}:`)
+      );
+
+      if (claimedEvents.length > 0) {
+        const latestEvent = claimedEvents[claimedEvents.length - 1];
+        return latestEvent.data.includes(": true");
+      }
+
+      return false;
+    } catch (error) {
+      console.error("Error checking claimed status:", error);
+      return false;
     }
   }
 
