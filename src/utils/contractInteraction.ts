@@ -21,6 +21,10 @@ export interface PollCreationParams {
   fixedRewardAmount: number; // Amount per voter (if FIXED_REWARD mode)
   fundingGoal: number; // Target amount for community-funded polls
   rewardPoolAmount: number; // Initial funding for self-funded polls
+  // Reward token parameters
+  rewardTokenType: number; // 0=NATIVE_MASSA, 1=CUSTOM_TOKEN
+  voteRewardAmount: number; // Reward amount per vote
+  createPollRewardAmount: number; // Reward for creating the poll
 }
 
 export interface ProjectCreationParams {
@@ -196,6 +200,16 @@ export class PollsContract {
       args.addU64(fixedRewardInNano);
       args.addU64(fundingGoalInNano);
 
+      // Add reward token parameters
+      args.addU8(BigInt(params.rewardTokenType));
+
+      // Convert token amounts to smallest unit (9 decimals for MPOLLS, nanoMASSA for native)
+      const voteRewardInSmallestUnit = BigInt(Math.floor(params.voteRewardAmount * 1e9));
+      const createRewardInSmallestUnit = BigInt(Math.floor(params.createPollRewardAmount * 1e9));
+
+      args.addU64(voteRewardInSmallestUnit);
+      args.addU64(createRewardInSmallestUnit);
+
       console.log("📦 Prepared arguments with economics:", {
         title: params.title,
         description: params.description,
@@ -207,7 +221,10 @@ export class PollsContract {
         distributionType: params.distributionType,
         fixedRewardAmount: params.fixedRewardAmount,
         fundingGoal: params.fundingGoal,
-        rewardPoolAmount: params.rewardPoolAmount
+        rewardPoolAmount: params.rewardPoolAmount,
+        rewardTokenType: params.rewardTokenType,
+        voteRewardAmount: params.voteRewardAmount,
+        createPollRewardAmount: params.createPollRewardAmount
       });
 
       // Make the actual blockchain transaction using wallet provider

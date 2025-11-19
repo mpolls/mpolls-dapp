@@ -61,7 +61,6 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
   // Wallet connection state
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [isConnectingWallet, setIsConnectingWallet] = useState(false);
 
   // Voting feedback state
   const [votingStatus, setVotingStatus] = useState<{
@@ -279,24 +278,6 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
     }
   };
 
-  const connectWallet = async () => {
-    setIsConnectingWallet(true);
-    try {
-      const connected = await pollsContract.connectWallet();
-      if (connected) {
-        await checkWalletConnection();
-        toast.success('Wallet connected successfully!');
-      } else {
-        toast.error('Failed to connect wallet. Please try again.');
-      }
-    } catch (error) {
-      logError(error, { action: 'connecting wallet' });
-      const friendlyError = parseBlockchainError(error, { action: 'connecting wallet' });
-      toast.error(`${friendlyError.message} ${friendlyError.suggestion}`);
-    } finally {
-      setIsConnectingWallet(false);
-    }
-  };
 
   const handleVote = async (pollId: number, optionIndex: number) => {
     // Check if already voted
@@ -307,9 +288,10 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
       setVotingStatus({
         pollId,
         isVoting: false,
-        message: 'Please connect your wallet to vote',
+        message: 'Please connect your wallet using the "Connect Wallet" button in the header to vote',
         type: 'error'
       });
+      toast.error('Please connect your wallet in the header to vote');
       return;
     }
     
@@ -458,30 +440,6 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
               <p>Decentralized voting on the Massa blockchain</p>
             </div>
             <div className="header-right">
-              {/* Wallet Connection Status */}
-              <div className="wallet-section">
-                {isWalletConnected ? (
-                  <div className="wallet-connected">
-                    <span className="wallet-status"><CheckCircleIcon sx={{ fontSize: 18, marginRight: 0.5, verticalAlign: 'middle' }} /> Wallet Connected</span>
-                    {walletAddress && (
-                      <span className="wallet-address">
-                        {walletAddress.length > 20 ? 
-                          `${walletAddress.slice(0, 8)}...${walletAddress.slice(-8)}` : 
-                          walletAddress
-                        }
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <button 
-                    className="connect-wallet-btn"
-                    onClick={connectWallet}
-                    disabled={isConnectingWallet}
-                  >
-                    {isConnectingWallet ? <><RefreshIcon sx={{ fontSize: 18, marginRight: 0.5, verticalAlign: 'middle' }} /> Connecting...</> : <><LinkIcon sx={{ fontSize: 18, marginRight: 0.5, verticalAlign: 'middle' }} /> Connect Wallet</>}
-                  </button>
-                )}
-              </div>
               <a 
                 href="https://explorer.massa.net/mainnet" 
                 target="_blank" 
