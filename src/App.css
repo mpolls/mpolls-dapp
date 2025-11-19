@@ -1911,6 +1911,50 @@ html, body {
   color: rgba(255, 255, 255, 0.9);
 }
 
+/* Creation Mode Tabs */
+.creation-mode-tabs {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-bottom: 32px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mode-tab {
+  flex: 1;
+  max-width: 200px;
+  padding: 12px 24px;
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.mode-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 215, 0, 0.5);
+  color: rgba(255, 215, 0, 0.9);
+  transform: translateY(-2px);
+}
+
+.mode-tab.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: #FFD700;
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.ai-chat-mode {
+  margin-top: 24px;
+}
+
 .error-message {
   background: rgba(255, 0, 0, 0.2);
   border: 1px solid rgba(255, 0, 0, 0.5);

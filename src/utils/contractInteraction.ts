@@ -781,6 +781,208 @@ export class PollsContract {
     }
   }
 
+  // ================= AUTONOMOUS SC METHODS =================
+
+  async enableAutonomous(): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("🤖 Enabling autonomous SC execution");
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "enableAutonomous",
+        parameter: new Args().serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Autonomous SC enabled!");
+      return true;
+    } catch (error) {
+      console.error("Error enabling autonomous:", error);
+      throw new Error(`Failed to enable autonomous SC: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async disableAutonomous(): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("🤖 Disabling autonomous SC execution");
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "disableAutonomous",
+        parameter: new Args().serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Autonomous SC disabled!");
+      return true;
+    } catch (error) {
+      console.error("Error disabling autonomous:", error);
+      throw new Error(`Failed to disable autonomous SC: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async isAutonomousEnabled(): Promise<boolean> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "isAutonomousEnabled",
+        parameter: new Args().serialize(),
+      });
+
+      // Get events
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      const enabledEvents = events.filter(event =>
+        event.data.includes("Autonomous SC enabled:")
+      );
+
+      if (enabledEvents.length > 0) {
+        const latestEvent = enabledEvents[enabledEvents.length - 1];
+        return latestEvent.data.includes(": true");
+      }
+
+      return false;
+    } catch (error) {
+      console.error("Error checking autonomous status:", error);
+      return false;
+    }
+  }
+
+  async setAutonomousInterval(intervalSeconds: number): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log(`🤖 Setting autonomous interval to ${intervalSeconds} seconds`);
+
+      const args = new Args().addU64(BigInt(intervalSeconds));
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "setAutonomousInterval",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Autonomous interval updated!");
+      return true;
+    } catch (error) {
+      console.error("Error setting autonomous interval:", error);
+      throw new Error(`Failed to set interval: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getAutonomousInterval(): Promise<number> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "getAutonomousInterval",
+        parameter: new Args().serialize(),
+      });
+
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      const intervalEvents = events.filter(event =>
+        event.data.includes("Autonomous SC interval:")
+      );
+
+      if (intervalEvents.length > 0) {
+        const latestEvent = intervalEvents[intervalEvents.length - 1];
+        const match = latestEvent.data.match(/interval: (\d+) seconds/);
+        if (match) {
+          return parseInt(match[1]);
+        }
+      }
+
+      return 3600; // Default 1 hour
+    } catch (error) {
+      console.error("Error getting autonomous interval:", error);
+      return 3600;
+    }
+  }
+
+  async getLastAutonomousRun(): Promise<number> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "getLastAutonomousRun",
+        parameter: new Args().serialize(),
+      });
+
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      const runEvents = events.filter(event =>
+        event.data.includes("Last autonomous run:")
+      );
+
+      if (runEvents.length > 0) {
+        const latestEvent = runEvents[runEvents.length - 1];
+        const match = latestEvent.data.match(/run: (\d+)/);
+        if (match) {
+          return parseInt(match[1]);
+        }
+      }
+
+      return 0;
+    } catch (error) {
+      console.error("Error getting last autonomous run:", error);
+      return 0;
+    }
+  }
+
+  async manualTriggerDistribution(pollId: string): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log(`🤖 Manually triggering distribution for poll ${pollId}`);
+
+      const args = new Args().addString(pollId);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "manualTriggerDistribution",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Manual distribution triggered!");
+      return true;
+    } catch (error) {
+      console.error("Error triggering manual distribution:", error);
+      throw new Error(`Failed to trigger distribution: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   // Admin function to fund the contract
   async fundContract(amountInMassa: number): Promise<boolean> {
     if (!this.account) {
@@ -1351,6 +1553,138 @@ export class PollsContract {
     } catch (error) {
       console.error("Error fetching polls by project:", error);
       return [];
+    }
+  }
+
+  // ============= TREASURY FUNCTIONS =============
+
+  async approveTreasuryPoll(pollId: string, fundingAmount: number = 0): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log(`✅ Approving treasury poll ${pollId}${fundingAmount > 0 ? ` with ${fundingAmount} MASSA funding` : ''}`);
+
+      const args = new Args().addString(pollId);
+      const coins = fundingAmount > 0 ? BigInt(Math.floor(fundingAmount * 1e9)) : 0n;
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "approveTreasuryPoll",
+        parameter: args.serialize(),
+        coins,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Treasury poll approved!");
+      return true;
+    } catch (error) {
+      console.error("Error approving treasury poll:", error);
+      throw new Error(`Failed to approve poll: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async rejectTreasuryPoll(pollId: string): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log(`❌ Rejecting treasury poll ${pollId}`);
+
+      const args = new Args().addString(pollId);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "rejectTreasuryPoll",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Treasury poll rejected!");
+      return true;
+    } catch (error) {
+      console.error("Error rejecting treasury poll:", error);
+      throw new Error(`Failed to reject poll: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getPendingTreasuryPolls(): Promise<string[]> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "getPendingTreasuryPolls",
+        parameter: new Uint8Array(),
+      });
+
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+        start: null,
+        end: null,
+      });
+
+      const pendingEvents = events.filter(event =>
+        event.data.includes("Pending treasury polls:")
+      );
+
+      if (pendingEvents.length > 0) {
+        const latestEvent = pendingEvents[pendingEvents.length - 1];
+        const dataMatch = latestEvent.data.match(/Pending treasury polls: (.*)/);
+        if (dataMatch && dataMatch[1] && dataMatch[1].trim() !== '') {
+          return dataMatch[1].split(',').map(id => id.trim());
+        }
+      }
+
+      return [];
+    } catch (error) {
+      console.error("Error fetching pending treasury polls:", error);
+      return [];
+    }
+  }
+
+  async getTreasuryApprovalStatus(pollId: string): Promise<{ fundingType: string; status: string }> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      const args = new Args().addString(pollId);
+
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "getTreasuryApprovalStatus",
+        parameter: args.serialize(),
+      });
+
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+        start: null,
+        end: null,
+      });
+
+      const statusEvents = events.filter(event =>
+        event.data.includes(`Poll ${pollId} - Funding type:`)
+      );
+
+      if (statusEvents.length > 0) {
+        const latestEvent = statusEvents[statusEvents.length - 1];
+        const fundingTypeMatch = latestEvent.data.match(/Funding type: (\w+)/);
+        const statusMatch = latestEvent.data.match(/Approval status: (\w+)/);
+
+        return {
+          fundingType: fundingTypeMatch ? fundingTypeMatch[1] : 'unknown',
+          status: statusMatch ? statusMatch[1] : 'unknown',
+        };
+      }
+
+      return { fundingType: 'unknown', status: 'unknown' };
+    } catch (error) {
+      console.error("Error getting treasury approval status:", error);
+      return { fundingType: 'unknown', status: 'unknown' };
     }
   }
 }

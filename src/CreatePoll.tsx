@@ -6,6 +6,8 @@ import LinkIcon from '@mui/icons-material/Link';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import FolderIcon from '@mui/icons-material/Folder';
+import { AIChatBox } from './components/AIChatBox';
+import { PollParameters } from './api/openai';
 
 interface CreatePollProps {
   onBack: () => void;
@@ -39,6 +41,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [projects, setProjects] = useState<ContractProject[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [creationMode, setCreationMode] = useState<'form' | 'ai-chat'>('form');
 
   useEffect(() => {
     checkWalletConnection();
@@ -127,6 +130,30 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
     return "";
   };
 
+  const handleAIPollReady = (params: PollParameters) => {
+    // Populate form data from AI-extracted parameters
+    setFormData(prev => ({
+      ...prev,
+      title: params.title || "",
+      description: params.description || "",
+      options: params.options || ["", ""],
+      duration: params.duration || 7,
+      fundingType: (params.fundingType || "self") as "self" | "community" | "treasury",
+      distributionMode: (params.distributionMode || "equal") as "equal" | "fixed" | "weighted",
+      distributionType: (params.distributionType || "manual-pull") as "manual-pull" | "manual-push" | "autonomous",
+      rewardPool: params.rewardPool || 0,
+      fixedRewardAmount: params.fixedRewardAmount || 0,
+      fundingGoal: params.fundingGoal || 0,
+    }));
+
+    // Switch to form mode to review and submit
+    setCreationMode('form');
+    setSuccess("Poll parameters loaded from AI! Review and submit below.");
+
+    // Scroll to top of form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const createPoll = async () => {
     const validationError = validateForm();
     if (validationError) {
@@ -172,7 +199,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
       const pollId = await pollsContract.createPoll(pollParams);
 
       setSuccess(`Poll created successfully! Poll ID: ${pollId}. Redirecting to polls list...`);
-      
+
       // Reset form
       setFormData({
         title: "",
@@ -215,7 +242,33 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
         <div className="create-poll-content">
           <h1>Create New Poll</h1>
           <p className="subtitle">Design your decentralized poll or contest on the Massa blockchain</p>
-          
+
+          {/* Creation Mode Tabs */}
+          <div className="creation-mode-tabs">
+            <button
+              className={`mode-tab ${creationMode === 'form' ? 'active' : ''}`}
+              onClick={() => setCreationMode('form')}
+            >
+              Manual Form
+            </button>
+            <button
+              className={`mode-tab ${creationMode === 'ai-chat' ? 'active' : ''}`}
+              onClick={() => setCreationMode('ai-chat')}
+            >
+              AI Chat
+            </button>
+          </div>
+
+          {/* AI Chat Mode */}
+          {creationMode === 'ai-chat' && (
+            <div className="ai-chat-mode">
+              <AIChatBox onPollParametersReady={handleAIPollReady} />
+            </div>
+          )}
+
+          {/* Manual Form Mode */}
+          {creationMode === 'form' && (
+            <>
           {/* Contract Address Display */}
           <div className="contract-info">
             <h3><PlaceIcon sx={{ fontSize: 20, marginRight: 0.5, verticalAlign: 'middle' }} /> Contract Information</h3>
@@ -630,6 +683,8 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
               </button>
             </div>
           </form>
+            </>
+          )}
         </div>
       </div>
     </div>

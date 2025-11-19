@@ -25,7 +25,7 @@ const AdminPage = ({ onBack }: AdminPageProps) => {
   const [error, setError] = useState("");
   
   // Poll management state
-  const [activeTab, setActiveTab] = useState<"overview" | "polls" | "funding">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "polls" | "funding" | "autonomous" | "treasury">("overview");
   const [polls, setPolls] = useState<Poll[]>([]);
   const [isLoadingPolls, setIsLoadingPolls] = useState(false);
   const [pollsError, setPollsError] = useState("");
@@ -34,6 +34,22 @@ const AdminPage = ({ onBack }: AdminPageProps) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [pollToClose, setPollToClose] = useState<Poll | null>(null);
+
+  // Autonomous SC state
+  const [autonomousEnabled, setAutonomousEnabled] = useState(false);
+  const [autonomousInterval, setAutonomousInterval] = useState(3600);
+  const [lastAutonomousRun, setLastAutonomousRun] = useState(0);
+  const [newInterval, setNewInterval] = useState("3600");
+  const [isTogglingAutonomous, setIsTogglingAutonomous] = useState(false);
+  const [isUpdatingInterval, setIsUpdatingInterval] = useState(false);
+
+  // Treasury state
+  const [pendingTreasuryPolls, setPendingTreasuryPolls] = useState<Poll[]>([]);
+  const [isLoadingTreasury, setIsLoadingTreasury] = useState(false);
+  const [treasuryError, setTreasuryError] = useState("");
+  const [fundingAmounts, setFundingAmounts] = useState<{[pollId: string]: string}>({});
+  const [isApprovingPoll, setIsApprovingPoll] = useState<{[pollId: string]: boolean}>({});
+  const [isRejectingPoll, setIsRejectingPoll] = useState<{[pollId: string]: boolean}>({});
 
   useEffect(() => {
     checkAdminAccess();
@@ -75,6 +91,145 @@ const AdminPage = ({ onBack }: AdminPageProps) => {
     } finally {
       setIsLoadingPolls(false);
     }
+  };
+
+  const fetchAutonomousStatus = async () => {
+    try {
+      const enabled = await pollsContract.isAutonomousEnabled();
+      const interval = await pollsContract.getAutonomousInterval();
+      const lastRun = await pollsContract.getLastAutonomousRun();
+
+      setAutonomousEnabled(enabled);
+      setAutonomousInterval(interval);
+      setLastAutonomousRun(lastRun);
+      setNewInterval(interval.toString());
+    } catch (error) {
+      console.error("Failed to fetch autonomous status:", error);
+    }
+  };
+
+  const toggleAutonomous = async () => {
+    setIsTogglingAutonomous(true);
+    setMessage("");
+    setError("");
+
+    try {
+      if (autonomousEnabled) {
+        await pollsContract.disableAutonomous();
+        setMessage("Autonomous SC disabled successfully");
+        setAutonomousEnabled(false);
+      } else {
+        await pollsContract.enableAutonomous();
+        setMessage("Autonomous SC enabled successfully");
+        setAutonomousEnabled(true);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to toggle autonomous SC");
+    } finally {
+      setIsTogglingAutonomous(false);
+    }
+  };
+
+  const updateInterval = async () => {
+    const intervalSeconds = parseInt(newInterval);
+    if (isNaN(intervalSeconds) || intervalSeconds < 60) {
+      setError("Interval must be at least 60 seconds");
+      return;
+    }
+
+    setIsUpdatingInterval(true);
+    setMessage("");
+    setError("");
+
+    try {
+      await pollsContract.setAutonomousInterval(intervalSeconds);
+      setMessage(`Interval updated to ${intervalSeconds} seconds`);
+      setAutonomousInterval(intervalSeconds);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update interval");
+    } finally {
+      setIsUpdatingInterval(false);
+    }
+  };
+
+  // Treasury functions
+  const fetchPendingTreasuryPolls = async () => {
+    setIsLoadingTreasury(true);
+    setTreasuryError("");
+    try {
+      const pendingPollIds = await pollsContract.getPendingTreasuryPolls();
+      const allPolls = await pollsContract.getAllPolls();
+
+      const treasuryPolls = allPolls.filter(poll =>
+        pendingPollIds.includes(poll.id)
+      ).map(poll => ({
+        ...poll,
+        id: parseInt(poll.id),
+        votes: poll.votes,
+        totalVotes: poll.votes.reduce((sum, v) => sum + v, 0),
+        timeLeft: calculateTimeLeft(poll.endTime),
+        rewards: (poll.rewardPool / 1e9).toFixed(3)
+      }));
+
+      setPendingTreasuryPolls(treasuryPolls);
+    } catch (error) {
+      console.error("Failed to fetch pending treasury polls:", error);
+      setTreasuryError(error instanceof Error ? error.message : "Failed to load treasury polls");
+    } finally {
+      setIsLoadingTreasury(false);
+    }
+  };
+
+  const approvePoll = async (pollId: number) => {
+    setIsApprovingPoll(prev => ({ ...prev, [pollId]: true }));
+    setMessage("");
+    setError("");
+
+    try {
+      const fundingAmount = parseFloat(fundingAmounts[pollId] || "0");
+      await pollsContract.approveTreasuryPoll(pollId.toString(), fundingAmount);
+      setMessage(`Poll ${pollId} approved${fundingAmount > 0 ? ` with ${fundingAmount} MASSA funding` : ''}!`);
+
+      // Refresh pending polls
+      setTimeout(() => fetchPendingTreasuryPolls(), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to approve poll");
+    } finally {
+      setIsApprovingPoll(prev => ({ ...prev, [pollId]: false }));
+    }
+  };
+
+  const rejectPoll = async (pollId: number) => {
+    setIsRejectingPoll(prev => ({ ...prev, [pollId]: true }));
+    setMessage("");
+    setError("");
+
+    try {
+      await pollsContract.rejectTreasuryPoll(pollId.toString());
+      setMessage(`Poll ${pollId} rejected and closed!`);
+
+      // Refresh pending polls
+      setTimeout(() => fetchPendingTreasuryPolls(), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to reject poll");
+    } finally {
+      setIsRejectingPoll(prev => ({ ...prev, [pollId]: false }));
+    }
+  };
+
+  const calculateTimeLeft = (endTime: number): string => {
+    const now = Math.floor(Date.now() / 1000);
+    const diff = endTime - now;
+
+    if (diff <= 0) return "Ended";
+
+    const days = Math.floor(diff / 86400);
+    const hours = Math.floor((diff % 86400) / 3600);
+    const minutes = Math.floor((diff % 3600) / 60);
+
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
   };
 
   const handleEditPoll = (poll: Poll) => {
@@ -296,11 +451,29 @@ const AdminPage = ({ onBack }: AdminPageProps) => {
             >
               🗳️ Manage Polls
             </button>
-            <button 
+            <button
               className={`tab-btn ${activeTab === "funding" ? "active" : ""}`}
               onClick={() => setActiveTab("funding")}
             >
               💰 Funding
+            </button>
+            <button
+              className={`tab-btn ${activeTab === "autonomous" ? "active" : ""}`}
+              onClick={() => {
+                setActiveTab("autonomous");
+                fetchAutonomousStatus();
+              }}
+            >
+              🤖 Autonomous SC
+            </button>
+            <button
+              className={`tab-btn ${activeTab === "treasury" ? "active" : ""}`}
+              onClick={() => {
+                setActiveTab("treasury");
+                fetchPendingTreasuryPolls();
+              }}
+            >
+              🏛️ Treasury Approval
             </button>
           </div>
 
@@ -505,6 +678,255 @@ const AdminPage = ({ onBack }: AdminPageProps) => {
                     <li>Each poll creation requires approximately 0.0084 MASSA for storage</li>
                     <li>Keeping the contract funded ensures smooth user experience</li>
                     <li>You can fund multiple times as needed</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Autonomous SC Tab */}
+          {activeTab === "autonomous" && (
+            <div className="tab-content">
+              <div className="autonomous-section">
+                <h2>🤖 Autonomous Smart Contract</h2>
+                <p className="section-description">
+                  Configure automatic reward distribution for polls with autonomous distribution type.
+                  The smart contract will periodically check for ended polls and distribute rewards automatically.
+                </p>
+
+                {message && <div className="success-message">{message}</div>}
+                {error && <div className="error-message">{error}</div>}
+
+                {/* Status Section */}
+                <div className="autonomous-status">
+                  <h3>Status</h3>
+                  <div className="status-grid">
+                    <div className="status-item">
+                      <span className="status-label">Autonomous Execution:</span>
+                      <span className={`status-value ${autonomousEnabled ? 'enabled' : 'disabled'}`}>
+                        {autonomousEnabled ? '✓ Enabled' : '✗ Disabled'}
+                      </span>
+                    </div>
+                    <div className="status-item">
+                      <span className="status-label">Check Interval:</span>
+                      <span className="status-value">{autonomousInterval} seconds ({Math.floor(autonomousInterval / 60)} minutes)</span>
+                    </div>
+                    <div className="status-item">
+                      <span className="status-label">Last Execution:</span>
+                      <span className="status-value">
+                        {lastAutonomousRun === 0 ? 'Never' : new Date(lastAutonomousRun * 1000).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Enable/Disable Section */}
+                <div className="autonomous-controls">
+                  <h3>Controls</h3>
+                  <div className="control-group">
+                    <button
+                      className={`autonomous-toggle-btn ${autonomousEnabled ? 'disable' : 'enable'}`}
+                      onClick={toggleAutonomous}
+                      disabled={isTogglingAutonomous}
+                    >
+                      {isTogglingAutonomous
+                        ? 'Processing...'
+                        : autonomousEnabled
+                          ? '❌ Disable Autonomous Execution'
+                          : '✅ Enable Autonomous Execution'
+                      }
+                    </button>
+                    <p className="control-hint">
+                      {autonomousEnabled
+                        ? 'Autonomous SC is currently running. Polls with autonomous distribution will be processed automatically.'
+                        : 'Enable autonomous execution to automatically distribute rewards when polls end.'
+                      }
+                    </p>
+                  </div>
+                </div>
+
+                {/* Interval Configuration */}
+                <div className="autonomous-config">
+                  <h3>Configuration</h3>
+                  <div className="config-group">
+                    <label htmlFor="autonomousInterval">Check Interval (seconds)</label>
+                    <div className="interval-input-group">
+                      <input
+                        type="number"
+                        id="autonomousInterval"
+                        value={newInterval}
+                        onChange={(e) => setNewInterval(e.target.value)}
+                        min="60"
+                        step="60"
+                        placeholder="3600"
+                        disabled={isUpdatingInterval}
+                      />
+                      <button
+                        className="update-interval-btn"
+                        onClick={updateInterval}
+                        disabled={isUpdatingInterval || newInterval === autonomousInterval.toString()}
+                      >
+                        {isUpdatingInterval ? 'Updating...' : 'Update Interval'}
+                      </button>
+                    </div>
+                    <small>Minimum: 60 seconds. Recommended: 3600 seconds (1 hour) or more to avoid high gas costs.</small>
+                    <div className="interval-presets">
+                      <span>Quick select:</span>
+                      <button onClick={() => setNewInterval("300")}>5 min</button>
+                      <button onClick={() => setNewInterval("1800")}>30 min</button>
+                      <button onClick={() => setNewInterval("3600")}>1 hour</button>
+                      <button onClick={() => setNewInterval("21600")}>6 hours</button>
+                      <button onClick={() => setNewInterval("86400")}>24 hours</button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Information Section */}
+                <div className="autonomous-info">
+                  <h4>ℹ️ How Autonomous SC Works</h4>
+                  <ul>
+                    <li>The smart contract automatically checks for ended polls at the configured interval</li>
+                    <li>Only polls with "Autonomous" distribution type are processed</li>
+                    <li>Rewards are calculated and marked as distributed automatically</li>
+                    <li>Gas costs are paid from the contract balance - ensure the contract is funded</li>
+                    <li>Longer intervals reduce gas costs but may delay reward distribution</li>
+                  </ul>
+                </div>
+
+                <div className="autonomous-warning">
+                  <h4>⚠️ Important Notes</h4>
+                  <ul>
+                    <li>Keep the contract funded to ensure autonomous execution continues</li>
+                    <li>Monitor the "Last Execution" timestamp to verify the system is working</li>
+                    <li>You can manually trigger distribution for specific polls if needed</li>
+                    <li>Disable autonomous execution during maintenance or testing</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Treasury Approval Tab */}
+          {activeTab === "treasury" && (
+            <div className="tab-content">
+              <div className="treasury-section">
+                <h2>🏛️ Treasury Poll Approval</h2>
+                <p className="section-description">
+                  Review and approve polls requesting treasury funding. You can approve with optional funding or reject polls that don't meet criteria.
+                </p>
+
+                {message && <div className="success-message">{message}</div>}
+                {error && <div className="error-message">{error}</div>}
+                {treasuryError && <div className="error-message">{treasuryError}</div>}
+
+                <div className="pending-polls">
+                  <div className="section-header">
+                    <h3>Pending Treasury Polls</h3>
+                    <button
+                      className="refresh-btn"
+                      onClick={fetchPendingTreasuryPolls}
+                      disabled={isLoadingTreasury}
+                    >
+                      {isLoadingTreasury ? 'Loading...' : '🔄 Refresh'}
+                    </button>
+                  </div>
+
+                  {isLoadingTreasury ? (
+                    <div className="loading-message">Loading pending polls...</div>
+                  ) : pendingTreasuryPolls.length === 0 ? (
+                    <div className="no-polls-message">
+                      <p>✓ No pending treasury polls awaiting approval</p>
+                    </div>
+                  ) : (
+                    <div className="polls-grid">
+                      {pendingTreasuryPolls.map((poll) => (
+                        <div key={poll.id} className="treasury-poll-card">
+                          <div className="poll-header">
+                            <h4>{poll.title}</h4>
+                            <span className="poll-id">#{poll.id}</span>
+                          </div>
+
+                          <div className="poll-description">{poll.description}</div>
+
+                          <div className="poll-stats">
+                            <div className="stat-item">
+                              <span className="stat-label">Creator:</span>
+                              <span className="stat-value">{poll.creator.slice(0, 10)}...{poll.creator.slice(-8)}</span>
+                            </div>
+                            <div className="stat-item">
+                              <span className="stat-label">Options:</span>
+                              <span className="stat-value">{poll.options.length} options</span>
+                            </div>
+                            <div className="stat-item">
+                              <span className="stat-label">Time Left:</span>
+                              <span className="stat-value">{poll.timeLeft}</span>
+                            </div>
+                            <div className="stat-item">
+                              <span className="stat-label">Votes:</span>
+                              <span className="stat-value">{poll.totalVotes}</span>
+                            </div>
+                          </div>
+
+                          <div className="funding-controls">
+                            <div className="funding-input-group">
+                              <label htmlFor={`funding-${poll.id}`}>Optional Funding (MASSA)</label>
+                              <input
+                                type="number"
+                                id={`funding-${poll.id}`}
+                                value={fundingAmounts[poll.id] || ""}
+                                onChange={(e) => setFundingAmounts(prev => ({
+                                  ...prev,
+                                  [poll.id]: e.target.value
+                                }))}
+                                placeholder="0.00"
+                                min="0"
+                                step="0.001"
+                                disabled={isApprovingPoll[poll.id] || isRejectingPoll[poll.id]}
+                              />
+                              <small>Leave empty to approve without funding</small>
+                            </div>
+
+                            <div className="action-buttons">
+                              <button
+                                className="approve-btn"
+                                onClick={() => approvePoll(poll.id)}
+                                disabled={isApprovingPoll[poll.id] || isRejectingPoll[poll.id]}
+                              >
+                                {isApprovingPoll[poll.id] ? 'Approving...' : '✓ Approve'}
+                              </button>
+                              <button
+                                className="reject-btn"
+                                onClick={() => rejectPoll(poll.id)}
+                                disabled={isApprovingPoll[poll.id] || isRejectingPoll[poll.id]}
+                              >
+                                {isRejectingPoll[poll.id] ? 'Rejecting...' : '✗ Reject & Close'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="treasury-info">
+                  <h4>ℹ️ Treasury Approval Process</h4>
+                  <ul>
+                    <li>Only polls with "Treasury-Funded" funding type appear here</li>
+                    <li>Approving a poll allows it to receive treasury funding and be visible to voters</li>
+                    <li>You can optionally fund the poll when approving by entering an amount</li>
+                    <li>Rejecting a poll will close it and prevent any further activity</li>
+                    <li>Make sure to review poll content and creator before approving</li>
+                  </ul>
+                </div>
+
+                <div className="treasury-warning">
+                  <h4>⚠️ Best Practices</h4>
+                  <ul>
+                    <li>Verify poll content aligns with community guidelines</li>
+                    <li>Check that the poll creator has a good track record</li>
+                    <li>Consider funding polls that benefit the community</li>
+                    <li>Rejected polls cannot be reopened - make sure before rejecting</li>
                   </ul>
                 </div>
               </div>
