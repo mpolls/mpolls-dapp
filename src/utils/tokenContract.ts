@@ -50,6 +50,36 @@ export class TokenContract {
     }
   }
 
+  /**
+   * Sync wallet connection from another contract instance (e.g., pollsContract)
+   * This allows sharing wallet connection across different contract instances
+   */
+  async syncWalletConnection(): Promise<boolean> {
+    try {
+      const wallets = await getWallets();
+      if (wallets.length === 0) {
+        return false;
+      }
+
+      this.wallet = wallets[0];
+      const connected = await this.wallet.connected();
+
+      if (connected) {
+        const accounts = await this.wallet.accounts();
+        if (accounts.length === 0) {
+          return false;
+        }
+        this.account = accounts[0];
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error("Failed to sync wallet connection:", error);
+      return false;
+    }
+  }
+
   async isWalletConnected(): Promise<boolean> {
     try {
       if (this.wallet && this.account) {
@@ -125,10 +155,13 @@ export class TokenContract {
         smartContractAddress: this.contractAddress,
       });
 
-      const nameEvent = events.find(e => e.data.includes("Token name:"));
-      const symbolEvent = events.find(e => e.data.includes("Token symbol:"));
-      const decimalsEvent = events.find(e => e.data.includes("Token decimals:"));
-      const supplyEvent = events.find(e => e.data.includes("Total supply:"));
+      // Find the most recent events matching our patterns (reverse to get newest first)
+      const recentEvents = [...events].reverse();
+
+      const nameEvent = recentEvents.find(e => e.data.startsWith("Token name:"));
+      const symbolEvent = recentEvents.find(e => e.data.startsWith("Token symbol:"));
+      const decimalsEvent = recentEvents.find(e => e.data.startsWith("Token decimals:"));
+      const supplyEvent = recentEvents.find(e => e.data.startsWith("Total supply:"));
 
       const name = nameEvent ? nameEvent.data.replace("Token name:", "").trim() : "MPOLLS";
       const symbol = symbolEvent ? symbolEvent.data.replace("Token symbol:", "").trim() : "MPOLLS";
@@ -161,7 +194,9 @@ export class TokenContract {
         smartContractAddress: this.contractAddress,
       });
 
-      const balanceEvent = events.find(e => e.data.includes(`Balance of ${address}:`));
+      // Get most recent event (reverse to get newest first)
+      const recentEvents = [...events].reverse();
+      const balanceEvent = recentEvents.find(e => e.data.includes(`Balance of ${address}:`));
       if (balanceEvent) {
         const match = balanceEvent.data.match(/Balance of .+: (\d+)/);
         if (match) {
@@ -193,7 +228,9 @@ export class TokenContract {
         smartContractAddress: this.contractAddress,
       });
 
-      const balanceEvent = events.find(e => e.data.includes("Your balance:"));
+      // Get most recent event (reverse to get newest first)
+      const recentEvents = [...events].reverse();
+      const balanceEvent = recentEvents.find(e => e.data.includes("Your balance:"));
       if (balanceEvent) {
         const match = balanceEvent.data.match(/Your balance: (\d+)/);
         if (match) {
@@ -329,7 +366,9 @@ export class TokenContract {
         smartContractAddress: this.contractAddress,
       });
 
-      const minterEvent = events.find(e => e.data.includes(`Address ${address} is minter:`));
+      // Get most recent event (reverse to get newest first)
+      const recentEvents = [...events].reverse();
+      const minterEvent = recentEvents.find(e => e.data.includes(`Address ${address} is minter:`));
       if (minterEvent) {
         return minterEvent.data.includes("true");
       }

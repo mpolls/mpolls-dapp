@@ -44,10 +44,15 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack, isWalletConnected = false
   }, []);
 
   useEffect(() => {
-    if (isWalletConnected && walletAddress) {
-      refreshBalance();
-      checkMinterStatus();
-    }
+    const syncWallet = async () => {
+      if (isWalletConnected && walletAddress && tokenContract) {
+        // Sync wallet connection from the global wallet state
+        await tokenContract.syncWalletConnection();
+        refreshBalance();
+        checkMinterStatus();
+      }
+    };
+    syncWallet();
   }, [isWalletConnected, walletAddress]);
 
   const fetchTokenInfo = async () => {
