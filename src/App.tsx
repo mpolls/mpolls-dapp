@@ -3,6 +3,7 @@ import { MassaLogo } from "@massalabs/react-ui-kit";
 import PollsApp from './PollsApp';
 import ProjectsPage from './ProjectsPage';
 import TokenPage from './TokenPage';
+import SwapPage from './SwapPage';
 import Navigation from './components/Navigation';
 import { pollsContract, ContractPoll } from './utils/contractInteraction';
 import { ToastProvider } from './components/ToastContainer';
@@ -13,7 +14,7 @@ import TableChartIcon from '@mui/icons-material/TableChart';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import './App.css';
 
-type PageType = 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token';
+type PageType = 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap';
 
 function App() {
   const [currentText, setCurrentText] = useState(0);
@@ -100,6 +101,21 @@ function App() {
   };
 
   // Render different pages based on current page
+  if (currentPage === 'swap') {
+    return (
+      <ToastProvider>
+        <Navigation
+          onNavigate={handleNavigation}
+          currentPage={currentPage}
+          onWalletConnect={handleWalletConnect}
+        />
+        <SwapPage
+          onBack={() => handleNavigation('home')}
+        />
+      </ToastProvider>
+    );
+  }
+
   if (currentPage === 'token') {
     return (
       <ToastProvider>
@@ -112,6 +128,7 @@ function App() {
           onBack={() => handleNavigation('home')}
           isWalletConnected={isWalletConnected}
           walletAddress={walletAddress}
+          onNavigateToSwap={() => handleNavigation('swap')}
         />
       </ToastProvider>
     );

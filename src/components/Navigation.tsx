@@ -6,6 +6,7 @@ import AddCircleIcon from '@mui/icons-material/AddCircle';
 import SettingsIcon from '@mui/icons-material/Settings';
 import FolderIcon from '@mui/icons-material/Folder';
 import TokenIcon from '@mui/icons-material/Token';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import LogoutIcon from '@mui/icons-material/Logout';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -14,8 +15,8 @@ import CheckIcon from '@mui/icons-material/Check';
 import { pollsContract } from '../utils/contractInteraction';
 
 interface NavigationProps {
-  onNavigate: (page: 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token') => void;
-  currentPage: 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token';
+  onNavigate: (page: 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap') => void;
+  currentPage: 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap';
   onScrollToSection?: (sectionId: string) => void;
   onWalletConnect?: (address: string, name: string) => void;
 }
@@ -277,16 +278,6 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, currentPage, onScro
               <AddCircleIcon sx={{ fontSize: 24 }} />
             </div>
             <span className="bottom-nav-label">Create</span>
-          </button>
-
-          <button
-            className={`bottom-nav-item ${currentPage === 'token' ? 'active' : ''}`}
-            onClick={() => onNavigate('token')}
-          >
-            <div className="bottom-nav-icon">
-              <TokenIcon sx={{ fontSize: 24 }} />
-            </div>
-            <span className="bottom-nav-label">Tokens</span>
           </button>
 
           <button

@@ -16,9 +16,10 @@ interface TokenPageProps {
   onBack: () => void;
   isWalletConnected?: boolean;
   walletAddress?: string | null;
+  onNavigateToSwap?: () => void;
 }
 
-const TokenPage: React.FC<TokenPageProps> = ({ onBack, isWalletConnected = false, walletAddress = null }) => {
+const TokenPage: React.FC<TokenPageProps> = ({ onBack, isWalletConnected = false, walletAddress = null, onNavigateToSwap }) => {
   const toast = useToast();
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
   const [balance, setBalance] = useState<string>('0');
@@ -310,45 +311,37 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack, isWalletConnected = false
           </div>
         )}
 
-        {/* Buy Tokens Section */}
+        {/* Swap Tokens Section */}
         {isWalletConnected && (
           <div className="action-section card buy-tokens-section">
             <h2>
-              💰 Buy MPOLLS Tokens
+              💱 Swap Tokens
             </h2>
-            <p className="section-description">Purchase MPOLLS tokens with MASSA to fund poll rewards</p>
+            <p className="section-description">Trade MASSA and MPOLLS tokens via the decentralized swap pool</p>
 
             <div className="exchange-rate-banner">
-              <strong>Exchange Rate:</strong> 1 MASSA = {EXCHANGE_RATE} MPOLLS
+              <strong>Note:</strong> The swap uses an AMM pool with 2.5% spread
             </div>
 
-            <div className="form-group">
-              <label>MASSA Amount</label>
-              <input
-                type="number"
-                placeholder="Enter MASSA amount"
-                value={buyMassaAmount}
-                onChange={(e) => setBuyMassaAmount(e.target.value)}
-                disabled={loading}
-                min="0.001"
-                step="0.001"
-              />
-              <small>Minimum: 0.001 MASSA</small>
-            </div>
-
-            <div className="conversion-preview">
-              <div className="preview-label">You will receive:</div>
-              <div className="preview-amount">
-                {(parseFloat(buyMassaAmount) * EXCHANGE_RATE).toLocaleString()} MPOLLS
-              </div>
+            <div className="swap-info-box">
+              <p>Use the Swap page to trade MASSA for MPOLLS or vice versa using our decentralized AMM liquidity pool.</p>
+              <ul>
+                <li>✓ Trade in both directions (MASSA ↔ MPOLLS)</li>
+                <li>✓ Real-time pricing based on liquidity</li>
+                <li>✓ Transparent 2.5% spread</li>
+                <li>✓ No intermediaries needed</li>
+              </ul>
             </div>
 
             <button
               className="action-button buy-button"
-              onClick={handleBuyTokens}
-              disabled={loading || !buyMassaAmount || parseFloat(buyMassaAmount) <= 0}
+              onClick={() => {
+                if (onNavigateToSwap) {
+                  onNavigateToSwap();
+                }
+              }}
             >
-              {loading ? 'Processing...' : `Buy ${(parseFloat(buyMassaAmount) * EXCHANGE_RATE).toLocaleString()} MPOLLS`}
+              Open Swap Page
             </button>
           </div>
         )}

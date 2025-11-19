@@ -413,6 +413,32 @@
   font-size: 1.1rem;
 }
 
+.swap-info-box {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.swap-info-box p {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #333;
+  line-height: 1.6;
+}
+
+.swap-info-box ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.swap-info-box li {
+  padding: 0.5rem 0;
+  color: #555;
+  font-size: 0.95rem;
+}
+
 .conversion-preview {
   background: rgba(102, 126, 234, 0.1);
   border: 2px solid rgba(102, 126, 234, 0.3);
