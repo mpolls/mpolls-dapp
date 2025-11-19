@@ -417,6 +417,42 @@ export class TokenContract {
     const paddedFraction = fraction.padEnd(decimals, '0').slice(0, decimals);
     return (BigInt(whole) * BigInt(10 ** decimals) + BigInt(paddedFraction)).toString();
   }
+
+  /**
+   * Buy MPOLLS tokens by sending MASSA
+   * @param massaAmount - Amount of MASSA to spend
+   */
+  async buyTokens(massaAmount: number): Promise<void> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log(`💰 Buying MPOLLS tokens with ${massaAmount} MASSA`);
+
+      // Convert MASSA to nanoMASSA
+      const massaInNano = BigInt(Math.floor(massaAmount * 1e9));
+
+      // Call buyTokens function on token contract
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "buyTokens",
+        parameter: new Args().serialize(), // No parameters needed
+        coins: massaInNano, // Send MASSA with transaction
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Token purchase successful!");
+      console.log("📋 Transaction result:", result);
+
+      // Wait for transaction to be processed
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+    } catch (error) {
+      console.error("Failed to buy tokens:", error);
+      throw error;
+    }
+  }
 }
 
 // Create a singleton instance (you'll need to add token contract address to .env)

@@ -34,6 +34,10 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
   const [transferAmount, setTransferAmount] = useState('');
   const [burnAmount, setBurnAmount] = useState('');
   const [grantMinterAddress, setGrantMinterAddress] = useState('');
+  const [buyMassaAmount, setBuyMassaAmount] = useState('1');
+
+  // Exchange rate constant
+  const EXCHANGE_RATE = 100; // 1 MASSA = 100 MPOLLS
 
   useEffect(() => {
     checkWalletConnection();
@@ -160,6 +164,34 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
     } catch (error) {
       console.error('Error minting tokens:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to mint tokens');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBuyTokens = async () => {
+    if (!tokenContract) {
+      toast.error('Token contract not initialized');
+      return;
+    }
+
+    const massaAmount = parseFloat(buyMassaAmount);
+    if (!massaAmount || massaAmount <= 0) {
+      toast.error('Please enter a valid MASSA amount');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await tokenContract.buyTokens(massaAmount);
+      const tokensReceived = massaAmount * EXCHANGE_RATE;
+      toast.success(`Successfully purchased ${tokensReceived} MPOLLS tokens for ${massaAmount} MASSA!`);
+      setBuyMassaAmount('1'); // Reset to default
+      await refreshBalance();
+      await fetchTokenInfo();
+    } catch (error) {
+      console.error('Error buying tokens:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to buy tokens');
     } finally {
       setLoading(false);
     }
@@ -363,6 +395,49 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
                 <span className="stat-value">{formatTotalSupply()} {tokenInfo.symbol}</span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Buy Tokens Section */}
+        {isConnected && (
+          <div className="action-section card buy-tokens-section">
+            <h2>
+              💰 Buy MPOLLS Tokens
+            </h2>
+            <p className="section-description">Purchase MPOLLS tokens with MASSA to fund poll rewards</p>
+
+            <div className="exchange-rate-banner">
+              <strong>Exchange Rate:</strong> 1 MASSA = {EXCHANGE_RATE} MPOLLS
+            </div>
+
+            <div className="form-group">
+              <label>MASSA Amount</label>
+              <input
+                type="number"
+                placeholder="Enter MASSA amount"
+                value={buyMassaAmount}
+                onChange={(e) => setBuyMassaAmount(e.target.value)}
+                disabled={loading}
+                min="0.001"
+                step="0.001"
+              />
+              <small>Minimum: 0.001 MASSA</small>
+            </div>
+
+            <div className="conversion-preview">
+              <div className="preview-label">You will receive:</div>
+              <div className="preview-amount">
+                {(parseFloat(buyMassaAmount) * EXCHANGE_RATE).toLocaleString()} MPOLLS
+              </div>
+            </div>
+
+            <button
+              className="action-button buy-button"
+              onClick={handleBuyTokens}
+              disabled={loading || !buyMassaAmount || parseFloat(buyMassaAmount) <= 0}
+            >
+              {loading ? 'Processing...' : `Buy ${(parseFloat(buyMassaAmount) * EXCHANGE_RATE).toLocaleString()} MPOLLS`}
+            </button>
           </div>
         )}
 
