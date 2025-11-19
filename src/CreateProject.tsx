@@ -10,9 +10,15 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 interface CreateProjectProps {
   onBack: () => void;
   onProjectCreated: () => void;
+  editingProject?: {
+    id: number;
+    name: string;
+    description: string;
+    creator: string;
+  } | null;
 }
 
-const CreateProject = ({ onBack, onProjectCreated }: CreateProjectProps) => {
+const CreateProject = ({ onBack, onProjectCreated, editingProject }: CreateProjectProps) => {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -30,9 +36,21 @@ const CreateProject = ({ onBack, onProjectCreated }: CreateProjectProps) => {
   const [walletName, setWalletName] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
 
+  const isEditMode = !!editingProject;
+
   useEffect(() => {
     checkWalletConnection();
-  }, []);
+
+    // Pre-populate form when editing
+    if (editingProject) {
+      setFormData({
+        name: editingProject.name,
+        description: editingProject.description,
+        tags: "",
+        visibility: "public"
+      });
+    }
+  }, [editingProject]);
 
   const checkWalletConnection = async () => {
     const connected = await pollsContract.isWalletConnected();
@@ -81,34 +99,52 @@ const CreateProject = ({ onBack, onProjectCreated }: CreateProjectProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("📝 Form submitted! Wallet connected:", isWalletConnected);
 
     const validationError = validateForm();
     if (validationError) {
+      console.log("❌ Validation error:", validationError);
       setError(validationError);
       return;
     }
 
     if (!isWalletConnected) {
+      console.log("❌ Wallet not connected");
       setError("Please connect your wallet first to create a project.");
       return;
     }
 
+    console.log("✅ Validation passed, starting project creation...");
     setIsCreating(true);
     setError("");
     setSuccess("");
 
     try {
-      console.log("🚀 Creating project on blockchain:", formData);
+      if (isEditMode && editingProject) {
+        console.log("🔄 Updating project on blockchain:", formData);
 
-      // Create project on blockchain
-      const projectId = await pollsContract.createProject({
-        name: formData.name,
-        description: formData.description
-      });
+        // Update existing project
+        await pollsContract.updateProject(editingProject.id.toString(), {
+          name: formData.name,
+          description: formData.description
+        });
 
-      console.log(`✅ Project created successfully with ID: ${projectId}`);
+        console.log(`✅ Project ${editingProject.id} updated successfully`);
 
-      setSuccess(`Project created successfully! Project ID: ${projectId}. Redirecting...`);
+        setSuccess(`Project updated successfully! Redirecting...`);
+      } else {
+        console.log("🚀 Creating project on blockchain:", formData);
+
+        // Create new project
+        const projectId = await pollsContract.createProject({
+          name: formData.name,
+          description: formData.description
+        });
+
+        console.log(`✅ Project created successfully with ID: ${projectId}`);
+
+        setSuccess(`Project created successfully! Project ID: ${projectId}. Redirecting...`);
+      }
 
       // Reset form
       setFormData({
@@ -118,15 +154,15 @@ const CreateProject = ({ onBack, onProjectCreated }: CreateProjectProps) => {
         visibility: "public"
       });
 
-      // Redirect after success to see the new project
+      // Redirect after success to see the project
       setTimeout(() => {
         onProjectCreated();
       }, 2000);
 
     } catch (err) {
-      console.error("❌ Error creating project:", err);
-      logError(err, { action: 'creating project' });
-      const friendlyError = parseBlockchainError(err, { action: 'creating project' });
+      console.error(`❌ Error ${isEditMode ? 'updating' : 'creating'} project:`, err);
+      logError(err, { action: `${isEditMode ? 'updating' : 'creating'} project` });
+      const friendlyError = parseBlockchainError(err, { action: `${isEditMode ? 'updating' : 'creating'} project` });
       setError(`${friendlyError.message} ${friendlyError.suggestion}`);
     } finally {
       setIsCreating(false);
@@ -141,8 +177,16 @@ const CreateProject = ({ onBack, onProjectCreated }: CreateProjectProps) => {
         </button>
 
         <div className="create-project-content">
-          <h1><FolderIcon sx={{ fontSize: 32, marginRight: 1, verticalAlign: 'middle' }} /> Create New Project</h1>
-          <p className="subtitle">Organize your polls under a project for better management</p>
+          <h1>
+            <FolderIcon sx={{ fontSize: 32, marginRight: 1, verticalAlign: 'middle' }} />
+            {isEditMode ? 'Edit Project' : 'Create New Project'}
+          </h1>
+          <p className="subtitle">
+            {isEditMode
+              ? 'Update your project details'
+              : 'Organize your polls under a project for better management'
+            }
+          </p>
 
           {error && (
             <div className="error-message">
@@ -303,8 +347,14 @@ const CreateProject = ({ onBack, onProjectCreated }: CreateProjectProps) => {
                 type="submit"
                 className="create-project-submit"
                 disabled={isCreating || !isWalletConnected}
+                onClick={() => console.log(`🖱️ ${isEditMode ? 'Update' : 'Create'} Project button clicked! Disabled:`, isCreating || !isWalletConnected)}
               >
-                {isCreating ? "Creating Project..." : !isWalletConnected ? "Connect Wallet to Create Project" : "Create Project"}
+                {isCreating
+                  ? (isEditMode ? "Updating Project..." : "Creating Project...")
+                  : !isWalletConnected
+                    ? `Connect Wallet to ${isEditMode ? 'Update' : 'Create'} Project`
+                    : (isEditMode ? "Update Project" : "Create Project")
+                }
               </button>
             </div>
           </form>

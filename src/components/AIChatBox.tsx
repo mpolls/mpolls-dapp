@@ -97,9 +97,9 @@ export const AIChatBox: React.FC<AIChatBoxProps> = ({ onPollParametersReady }) =
   };
 
   const suggestedPrompts = [
-    "I want to create a customer satisfaction survey",
-    "Help me create a product feedback poll",
-    "I need a poll about team preferences",
+    "Create a 30-day poll asking what features to build next, with 10 MASSA reward pool, 1 MASSA per response",
+    "Create a customer satisfaction survey for 7 days with equal reward distribution",
+    "Make a poll about team lunch preferences for next week",
   ];
 
   if (error && !aiService) {
@@ -134,7 +134,7 @@ export const AIChatBox: React.FC<AIChatBoxProps> = ({ onPollParametersReady }) =
       <div className="ai-chatbox-messages">
         {messages.length === 0 && (
           <div className="ai-chatbox-suggestions">
-            <p>Try asking:</p>
+            <p>💡 Describe your poll in one message, or I'll guide you step-by-step:</p>
             {suggestedPrompts.map((prompt, index) => (
               <button
                 key={index}

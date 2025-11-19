@@ -1281,6 +1281,42 @@ export class PollsContract {
     }
   }
 
+  async updateProject(projectId: string, params: ProjectCreationParams): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("🔄 Updating project", projectId, "with parameters:", {
+        name: params.name,
+        description: params.description
+      });
+
+      const args = new Args()
+        .addString(projectId)
+        .addString(params.name)
+        .addString(params.description);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "updateProject",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Project update transaction successful!");
+
+      // Wait for transaction to process
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      return true;
+    } catch (error) {
+      console.error("Error updating project:", error);
+      throw new Error(`Failed to update project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   async getAllProjects(): Promise<ContractProject[]> {
     console.log('📁 Fetching All Projects');
 
@@ -1333,8 +1369,7 @@ export class PollsContract {
 
       console.log(`📁 Found ${projectEvents.length} project events using flexible patterns`);
 
-      const projects: ContractProject[] = [];
-      const processedIds = new Set<string>();
+      const projectsMap = new Map<string, ContractProject>();
 
       for (const event of projectEvents) {
         try {
@@ -1351,7 +1386,8 @@ export class PollsContract {
               const projectId = match[1];
               const creator = match[2];
 
-              if (!processedIds.has(projectId)) {
+              // Only use fallback if we don't already have this project
+              if (!projectsMap.has(projectId)) {
                 // Create a basic project object from the notification
                 const basicProject: ContractProject = {
                   id: projectId,
@@ -1362,9 +1398,8 @@ export class PollsContract {
                   pollIds: []
                 };
 
-                projects.push(basicProject);
-                processedIds.add(projectId);
-                console.log(`⚠️ Using fallback data for project #${projectId} (contract not emitting full data)`);
+                projectsMap.set(projectId, basicProject);
+                console.log(`⚠️ Using fallback data for project #${projectId} (will be updated if full data is found)`);
               }
             }
             continue;
@@ -1377,9 +1412,9 @@ export class PollsContract {
           }
 
           const project = this.parseProjectData(projectDataStr);
-          if (project && !processedIds.has(project.id)) {
-            projects.push(project);
-            processedIds.add(project.id);
+          if (project) {
+            // Always overwrite with full data (this replaces fallback data)
+            projectsMap.set(project.id, project);
             console.log(`✅ Successfully parsed project #${project.id}: "${project.name}"`);
           }
         } catch (parseError) {
@@ -1389,7 +1424,8 @@ export class PollsContract {
         }
       }
 
-      projects.sort((a, b) => parseInt(b.id) - parseInt(a.id));
+      // Convert map to array and sort by ID (newest first)
+      const projects = Array.from(projectsMap.values()).sort((a, b) => parseInt(b.id) - parseInt(a.id));
 
       console.log(`\n✅ Project retrieval completed! Found ${projects.length} projects`);
 

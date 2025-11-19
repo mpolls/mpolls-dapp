@@ -91,7 +91,16 @@ function App() {
           onNavigate={handleNavigation}
           currentPage={currentPage}
         />
-        <ProjectsPage onBack={() => handleNavigation('home')} />
+        <ProjectsPage
+          onBack={() => handleNavigation('home')}
+          onCreatePoll={(projectId) => {
+            // Navigate to create page with project ID stored
+            if (projectId) {
+              sessionStorage.setItem('selectedProjectId', projectId.toString());
+            }
+            handleNavigation('create');
+          }}
+        />
       </ToastProvider>
     );
   }

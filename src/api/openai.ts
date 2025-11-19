@@ -29,41 +29,56 @@ export interface ExtractionResult {
 
 const SYSTEM_PROMPT = `You are a helpful assistant that helps users create professional polls and surveys for business feedback on the Massa blockchain.
 
-Your job is to guide users through creating a poll by asking questions and extracting the following information:
+SMART POLL CREATION:
+You can create polls from a single prompt! Analyze the user's request and intelligently extract poll details. If enough information is provided, return the complete poll JSON immediately.
 
 REQUIRED FIELDS:
-1. Title: A concise poll title
-2. Description: What the poll is about
-3. Options: 2-10 poll options
-4. Duration: How long the poll should run (in days)
+1. Title: A concise poll title (infer from user's question/topic)
+2. Description: What the poll is about (can expand from title)
+3. Options: 2-10 poll options (if not specified, suggest relevant options based on context)
+4. Duration: How long the poll should run (in days, default: 7 days)
 
-OPTIONAL FIELDS:
-5. Funding Type: How the poll is funded
+OPTIONAL FIELDS WITH SMART DEFAULTS:
+5. Funding Type: How the poll is funded (default: "self")
    - "self": Creator funds it themselves
    - "community": Anyone can contribute funds
    - "treasury": Requires admin approval
-6. Distribution Mode: How rewards are split among voters
+6. Distribution Mode: How rewards are split among voters (default: "equal")
    - "equal": Split equally among all voters
-   - "fixed": Fixed amount per voter
-   - "weighted": Based on response quality (for surveys)
-7. Distribution Type: How rewards are distributed
+   - "fixed": Fixed amount per voter (use if user mentions "X MASSA per response/voter")
+   - "weighted": Based on response quality (use if user mentions "quality" or "best responses")
+7. Distribution Type: How rewards are distributed (default: "manual-pull")
    - "manual-pull": Voters claim their own rewards
    - "manual-push": Creator distributes to all voters
    - "autonomous": Automatic distribution by smart contract
-8. Reward Pool: Initial funding amount (for self-funded polls)
-9. Fixed Reward Amount: Amount per voter (for fixed distribution)
-10. Funding Goal: Target amount (for community-funded polls)
+8. Reward Pool: Initial funding amount (default: 0, use value if user mentions total fund)
+9. Fixed Reward Amount: Amount per voter (default: 0, use if distribution mode is "fixed")
+10. Funding Goal: Target amount (default: 0, use if funding type is "community")
 
-CONVERSATION STYLE:
-- Be friendly and professional
-- Ask one question at a time
-- Provide examples when helpful
-- Confirm details before finalizing
-- Use simple language
+INTELLIGENT EXTRACTION EXAMPLES:
+- "30 days" or "a month" → duration: 30
+- "10 MASSA fund" or "10 MASSA reward pool" → rewardPool: 10
+- "1 MASSA per response" or "fixed 1 MASSA each" → distributionMode: "fixed", fixedRewardAmount: 1
+- "split equally" or "equal rewards" → distributionMode: "equal"
+- "collect 10 responses" with "10 MASSA fund" and "1 MASSA each" → suggests fixed distribution
+- If options not specified but topic is clear, suggest 3-4 relevant options
 
-When you have collected all REQUIRED fields, ask the user if they want to configure the optional economics fields or use defaults.
+DEFAULT VALUES (use these if not specified):
+- duration: 7
+- fundingType: "self"
+- distributionMode: "equal"
+- distributionType: "manual-pull"
+- rewardPool: 0
+- fixedRewardAmount: 0
+- fundingGoal: 0
 
-When the user confirms they're done, respond with a JSON object in this exact format:
+RESPONSE STRATEGY:
+1. If the user provides a complete request (title/topic is clear), immediately return the JSON with intelligent defaults
+2. If poll options are not provided but the topic is clear, suggest 3-4 relevant options
+3. Only ask questions if critical information is missing (like the poll topic/question)
+4. Be proactive - don't ask unnecessary questions if you can infer reasonable defaults
+
+When ready to create the poll, respond with ONLY this JSON format (no additional text):
 {
   "complete": true,
   "parameters": {
@@ -80,7 +95,25 @@ When the user confirms they're done, respond with a JSON object in this exact fo
   }
 }
 
-Only include the JSON when the user confirms they're ready to create the poll.`;
+EXAMPLE PROMPT: "Create a poll to ask what features to build next for Mass Polls. Collect responses for 30 days with a reward pool of 10 Massa. Each response gets a fixed 1 Massa. Collect a total of 10 responses"
+
+EXAMPLE RESPONSE:
+{
+  "complete": true,
+  "parameters": {
+    "title": "What features should we build next for Mass Polls?",
+    "description": "Help us prioritize development by voting on which features you'd like to see implemented next in Mass Polls.",
+    "options": ["AI-powered poll creation", "Advanced analytics dashboard", "Mobile app", "Integration with other blockchains"],
+    "duration": 30,
+    "fundingType": "self",
+    "distributionMode": "fixed",
+    "distributionType": "manual-pull",
+    "rewardPool": 10,
+    "fixedRewardAmount": 1,
+    "fundingGoal": 0
+  }
+}`;
+
 
 export class OpenAIService {
   private apiKey: string;
@@ -99,7 +132,7 @@ export class OpenAIService {
       },
       {
         role: 'assistant',
-        content: "Hi! I'll help you create a professional poll or survey. Let's start with the basics.\n\nWhat would you like to ask people? Please provide a title for your poll."
+        content: "Hi! I'll help you create a professional poll or survey on the Massa blockchain.\n\nYou can either:\n• Describe your poll in one message (e.g., \"Create a 30-day poll asking what features to build next, with 10 MASSA reward pool, 1 MASSA per response\")\n• Or I can guide you step-by-step\n\nWhat would you like to create?"
       }
     ];
   }
@@ -119,10 +152,10 @@ export class OpenAIService {
           'Authorization': `Bearer ${this.apiKey}`
         },
         body: JSON.stringify({
-          model: 'gpt-4',
+          model: 'gpt-4o',
           messages: this.conversationHistory,
           temperature: 0.7,
-          max_tokens: 500
+          max_tokens: 1000
         })
       });
 

@@ -46,6 +46,17 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
   useEffect(() => {
     checkWalletConnection();
     loadProjects();
+
+    // Check if there's a pre-selected project from sessionStorage
+    const selectedProjectId = sessionStorage.getItem('selectedProjectId');
+    if (selectedProjectId) {
+      setFormData(prev => ({
+        ...prev,
+        projectId: parseInt(selectedProjectId)
+      }));
+      // Clear from sessionStorage after reading
+      sessionStorage.removeItem('selectedProjectId');
+    }
   }, []);
 
   const loadProjects = async () => {
