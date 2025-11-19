@@ -624,7 +624,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                       </label>
                     </div>
                     <small>
-                      {formData.rewardTokenType === "custom" && "MPOLLS tokens will be minted as rewards for respondents. Future update: you'll be able to transfer tokens from your balance."}
+                      {formData.rewardTokenType === "custom" && "Rewards paid from your MPOLLS token balance. Make sure to approve the polls contract to spend your tokens before creating the poll."}
                       {formData.rewardTokenType === "native" && "Rewards paid from poll's MASSA reward pool. Estimated respondent rewards will be included in the transaction."}
                     </small>
                   </div>
@@ -643,7 +643,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                     />
                     <small>
                       Reward amount each respondent receives for participating in your poll
-                      {formData.rewardTokenType === "custom" && " (minted as MPOLLS tokens)"}
+                      {formData.rewardTokenType === "custom" && " (transferred from your MPOLLS wallet balance)"}
                       {formData.rewardTokenType === "native" && " (transferred from your MASSA wallet balance)"}
                     </small>
                   </div>
@@ -651,6 +651,12 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                   {formData.fundingType === "self" && formData.voteRewardAmount > 0 && formData.rewardTokenType === "native" && (
                     <div className="info-banner">
                       <strong>💡 Initial Funding:</strong> The poll creation transaction will include <strong>{formData.voteRewardAmount * 10} MASSA</strong> (reward for ~10 respondents at {formData.voteRewardAmount} MASSA each). You can add more funds to the poll later to support additional respondents.
+                    </div>
+                  )}
+
+                  {formData.fundingType === "self" && formData.voteRewardAmount > 0 && formData.rewardTokenType === "custom" && (
+                    <div className="info-banner">
+                      <strong>💡 Token Approval Required:</strong> Before creating this poll, you must approve the polls contract to spend <strong>{formData.voteRewardAmount * 10} MPOLLS</strong> tokens from your balance. The contract will transfer these tokens when you create the poll (reward for ~10 respondents at {formData.voteRewardAmount} MPOLLS each).
                     </div>
                   )}
                 </div>

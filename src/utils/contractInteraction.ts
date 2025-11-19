@@ -210,6 +210,10 @@ export class PollsContract {
       args.addU64(voteRewardInSmallestUnit);
       args.addU64(createRewardInSmallestUnit);
 
+      // Add reward pool amount (for MPOLLS token funding)
+      const rewardPoolInSmallestUnit = BigInt(Math.floor(params.rewardPoolAmount * 1e9));
+      args.addU64(rewardPoolInSmallestUnit);
+
       console.log("📦 Prepared arguments with economics:", {
         title: params.title,
         description: params.description,
@@ -232,15 +236,26 @@ export class PollsContract {
       console.log("   Target:", this.contractAddress);
       console.log("   Function:", "createPoll");
       console.log("   Fee:", "0.01 MASSA");
-      
-      // Convert reward pool amount to nanoMASSA and send with transaction
-      const rewardPoolInNano = BigInt(Math.floor(params.rewardPoolAmount * 1e9));
+
+      // Convert reward pool amount to nanoMASSA
+      // Only send MASSA coins with transaction if using NATIVE_MASSA (rewardTokenType === 0)
+      // For MPOLLS tokens (rewardTokenType === 1), coins should be 0 (tokens pulled via transferFrom)
+      let coinsToSend: bigint;
+      if (params.rewardTokenType === 0) {
+        // NATIVE_MASSA: send MASSA with transaction
+        coinsToSend = BigInt(Math.floor(params.rewardPoolAmount * 1e9));
+      } else {
+        // CUSTOM_TOKEN: don't send MASSA (tokens are pulled from user's balance)
+        coinsToSend = BigInt(0);
+      }
+
+      console.log("   Coins to send:", coinsToSend, params.rewardTokenType === 0 ? "nanoMASSA" : "(0 - using MPOLLS tokens)");
 
       const result = await this.account.callSC({
         target: this.contractAddress,
         func: "createPoll",
         parameter: args.serialize(),
-        coins: rewardPoolInNano, // Send initial funding with poll creation
+        coins: coinsToSend, // Send MASSA only for native token rewards
         fee: Mas.fromString('0.01'), // Use same fee format as working implementation
       });
 
