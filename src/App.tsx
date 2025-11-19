@@ -21,6 +21,9 @@ function App() {
   const [email, setEmail] = useState('');
   const [featuredPolls, setFeaturedPolls] = useState<ContractPoll[]>([]);
   const [isLoadingPolls, setIsLoadingPolls] = useState(true);
+  const [walletAddress, setWalletAddress] = useState<string>('');
+  const [walletName, setWalletName] = useState<string>('');
+  const [isWalletConnected, setIsWalletConnected] = useState(false);
 
   const dynamicTexts = ['business', 'surveys', 'art contests', 'debates'];
 
@@ -30,6 +33,31 @@ function App() {
     }, 2000);
     return () => clearInterval(interval);
   }, [dynamicTexts.length]);
+
+  // Check wallet connection on mount
+  useEffect(() => {
+    const checkWallet = async () => {
+      try {
+        const connected = await pollsContract.isWalletConnected();
+        setIsWalletConnected(connected);
+        if (connected) {
+          const address = await pollsContract.getWalletAddress();
+          const name = pollsContract.getWalletName();
+          setWalletAddress(address || '');
+          setWalletName(name || '');
+        }
+      } catch (error) {
+        console.error('Error checking wallet connection:', error);
+      }
+    };
+    checkWallet();
+  }, []);
+
+  const handleWalletConnect = (address: string, name: string) => {
+    setWalletAddress(address);
+    setWalletName(name);
+    setIsWalletConnected(true);
+  };
 
   // Fetch featured polls from contract
   useEffect(() => {
@@ -78,8 +106,13 @@ function App() {
         <Navigation
           onNavigate={handleNavigation}
           currentPage={currentPage}
+          onWalletConnect={handleWalletConnect}
         />
-        <TokenPage onBack={() => handleNavigation('home')} />
+        <TokenPage
+          onBack={() => handleNavigation('home')}
+          isWalletConnected={isWalletConnected}
+          walletAddress={walletAddress}
+        />
       </ToastProvider>
     );
   }
@@ -90,6 +123,7 @@ function App() {
         <Navigation
           onNavigate={handleNavigation}
           currentPage={currentPage}
+          onWalletConnect={handleWalletConnect}
         />
         <ProjectsPage
           onBack={() => handleNavigation('home')}
@@ -111,6 +145,7 @@ function App() {
         <Navigation
           onNavigate={handleNavigation}
           currentPage={currentPage}
+          onWalletConnect={handleWalletConnect}
         />
         <PollsApp initialView={currentPage} onNavigate={handleNavigation} />
       </ToastProvider>
@@ -124,6 +159,7 @@ function App() {
           onNavigate={handleNavigation}
           currentPage={currentPage}
           onScrollToSection={scrollToSection}
+          onWalletConnect={handleWalletConnect}
         />
 
       <header className="hero-section">
