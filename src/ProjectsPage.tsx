@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import CreateProject from "./CreateProject";
 import { pollsContract } from "./utils/contractInteraction";
 import { logError } from "./utils/errorHandling";
@@ -12,6 +12,8 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import ErrorIcon from '@mui/icons-material/Error';
+import EditIcon from '@mui/icons-material/Edit';
+import AddCircleIcon from '@mui/icons-material/AddCircle';
 
 interface Project {
   id: number;
@@ -25,18 +27,36 @@ interface Project {
 
 interface ProjectsPageProps {
   onBack: () => void;
+  onCreatePoll?: (projectId?: number) => void;
 }
 
-const ProjectsPage = ({ onBack }: ProjectsPageProps) => {
+const ProjectsPage = ({ onBack, onCreatePoll }: ProjectsPageProps) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [projectsError, setProjectsError] = useState<string | null>(null);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchProjects();
+  }, []);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   const fetchProjects = async () => {
@@ -87,19 +107,43 @@ const ProjectsPage = ({ onBack }: ProjectsPageProps) => {
   };
 
   const handleCreateProject = () => {
+    setEditingProject(null); // Clear any editing state
     setShowCreateProject(true);
   };
 
   const handleProjectCreated = () => {
     setShowCreateProject(false);
+    setEditingProject(null);
     fetchProjects();
+  };
+
+  const handleMenuToggle = (projectId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOpenMenuId(openMenuId === projectId ? null : projectId);
+  };
+
+  const handleCreatePollForProject = (projectId: number) => {
+    setOpenMenuId(null);
+    if (onCreatePoll) {
+      onCreatePoll(projectId);
+    }
+  };
+
+  const handleEditProject = (project: Project) => {
+    setOpenMenuId(null);
+    setEditingProject(project);
+    setShowCreateProject(true);
   };
 
   if (showCreateProject) {
     return (
       <CreateProject
-        onBack={() => setShowCreateProject(false)}
+        onBack={() => {
+          setShowCreateProject(false);
+          setEditingProject(null);
+        }}
         onProjectCreated={handleProjectCreated}
+        editingProject={editingProject}
       />
     );
   }
@@ -228,9 +272,32 @@ const ProjectsPage = ({ onBack }: ProjectsPageProps) => {
                             </span>
                           </td>
                           <td className="td-actions">
-                            <button className="action-menu-btn" onClick={(e) => { e.stopPropagation(); }}>
-                              <MoreVertIcon sx={{ fontSize: 20 }} />
-                            </button>
+                            <div className="action-menu-container" ref={openMenuId === project.id ? menuRef : null}>
+                              <button
+                                className="action-menu-btn"
+                                onClick={(e) => handleMenuToggle(project.id, e)}
+                              >
+                                <MoreVertIcon sx={{ fontSize: 20 }} />
+                              </button>
+                              {openMenuId === project.id && (
+                                <div className="action-menu-dropdown">
+                                  <button
+                                    className="menu-item"
+                                    onClick={() => handleCreatePollForProject(project.id)}
+                                  >
+                                    <AddCircleIcon sx={{ fontSize: 18, marginRight: 1 }} />
+                                    Create Poll
+                                  </button>
+                                  <button
+                                    className="menu-item"
+                                    onClick={() => handleEditProject(project)}
+                                  >
+                                    <EditIcon sx={{ fontSize: 18, marginRight: 1 }} />
+                                    Edit Project
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -249,8 +316,31 @@ const ProjectsPage = ({ onBack }: ProjectsPageProps) => {
                         <div className="project-card-icon">
                           <FolderIcon sx={{ fontSize: 32 }} />
                         </div>
-                        <div className="project-card-menu">
-                          <MoreVertIcon sx={{ fontSize: 20 }} />
+                        <div className="action-menu-container" ref={openMenuId === project.id ? menuRef : null}>
+                          <button
+                            className="project-card-menu"
+                            onClick={(e) => handleMenuToggle(project.id, e)}
+                          >
+                            <MoreVertIcon sx={{ fontSize: 20 }} />
+                          </button>
+                          {openMenuId === project.id && (
+                            <div className="action-menu-dropdown">
+                              <button
+                                className="menu-item"
+                                onClick={() => handleCreatePollForProject(project.id)}
+                              >
+                                <AddCircleIcon sx={{ fontSize: 18, marginRight: 1 }} />
+                                Create Poll
+                              </button>
+                              <button
+                                className="menu-item"
+                                onClick={() => handleEditProject(project)}
+                              >
+                                <EditIcon sx={{ fontSize: 18, marginRight: 1 }} />
+                                Edit Project
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
 

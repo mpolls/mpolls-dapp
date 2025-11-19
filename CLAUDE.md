@@ -1,0 +1,1 @@
+Please look into the sibling project /Users/east/workspace/massa/mpolls-contract for the source codes of the Massa Contract.

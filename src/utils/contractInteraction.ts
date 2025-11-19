@@ -14,6 +14,13 @@ export interface PollCreationParams {
   options: string[];
   durationInSeconds: number;
   projectId?: number; // Optional project assignment
+  // New economics parameters
+  fundingType: number; // 0=SELF_FUNDED, 1=COMMUNITY_FUNDED, 2=TREASURY_FUNDED
+  distributionMode: number; // 0=EQUAL_SPLIT, 1=FIXED_REWARD, 2=WEIGHTED_QUALITY
+  distributionType: number; // 0=MANUAL_PULL, 1=MANUAL_PUSH, 2=AUTONOMOUS
+  fixedRewardAmount: number; // Amount per voter (if FIXED_REWARD mode)
+  fundingGoal: number; // Target amount for community-funded polls
+  rewardPoolAmount: number; // Initial funding for self-funded polls
 }
 
 export interface ProjectCreationParams {
@@ -42,6 +49,15 @@ export interface ContractPoll {
   endTime: number;
   status: 'active' | 'closed' | 'ended';
   projectId?: number; // Optional project assignment
+  // New economics fields
+  rewardPool: number; // Current reward pool in nanoMASSA
+  fundingType: number; // 0=SELF_FUNDED, 1=COMMUNITY_FUNDED, 2=TREASURY_FUNDED
+  distributionMode: number; // 0=EQUAL_SPLIT, 1=FIXED_REWARD, 2=WEIGHTED_QUALITY
+  distributionType: number; // 0=MANUAL_PULL, 1=MANUAL_PUSH, 2=AUTONOMOUS
+  fixedRewardAmount: number; // Amount per voter (if FIXED_REWARD mode)
+  fundingGoal: number; // Target amount for community-funded polls
+  treasuryApproved: boolean; // Approval status for treasury-funded polls
+  rewardsDistributed: boolean; // Whether rewards have been distributed
 }
 
 export class PollsContract {
@@ -148,7 +164,7 @@ export class PollsContract {
         explorer: `https://buildnet-explorer.massa.net/address/${this.contractAddress}`
       });
 
-      // Use the exact same argument structure as the working create-poll.js
+      // Build arguments with new economics parameters
       const args = new Args()
         .addString(params.title)
         .addString(params.description)
@@ -164,14 +180,34 @@ export class PollsContract {
       // Add optional projectId (0 means no project)
       if (params.projectId && params.projectId > 0) {
         args.addU64(BigInt(params.projectId));
+      } else {
+        args.addU64(BigInt(0));
       }
 
-      console.log("📦 Prepared arguments (matching working implementation):", {
+      // Add new economics parameters
+      args.addU8(BigInt(params.fundingType));
+      args.addU8(BigInt(params.distributionMode));
+      args.addU8(BigInt(params.distributionType));
+
+      // Convert MASSA to nanoMASSA (1 MASSA = 10^9 nanoMASSA)
+      const fixedRewardInNano = BigInt(Math.floor(params.fixedRewardAmount * 1e9));
+      const fundingGoalInNano = BigInt(Math.floor(params.fundingGoal * 1e9));
+
+      args.addU64(fixedRewardInNano);
+      args.addU64(fundingGoalInNano);
+
+      console.log("📦 Prepared arguments with economics:", {
         title: params.title,
         description: params.description,
         optionCount: params.options.length,
         options: params.options,
-        duration: `${params.durationInSeconds} seconds`
+        duration: `${params.durationInSeconds} seconds`,
+        fundingType: params.fundingType,
+        distributionMode: params.distributionMode,
+        distributionType: params.distributionType,
+        fixedRewardAmount: params.fixedRewardAmount,
+        fundingGoal: params.fundingGoal,
+        rewardPoolAmount: params.rewardPoolAmount
       });
 
       // Make the actual blockchain transaction using wallet provider
@@ -180,11 +216,14 @@ export class PollsContract {
       console.log("   Function:", "createPoll");
       console.log("   Fee:", "0.01 MASSA");
       
+      // Convert reward pool amount to nanoMASSA and send with transaction
+      const rewardPoolInNano = BigInt(Math.floor(params.rewardPoolAmount * 1e9));
+
       const result = await this.account.callSC({
         target: this.contractAddress,
         func: "createPoll",
         parameter: args.serialize(),
-        coins: 0n,
+        coins: rewardPoolInNano, // Send initial funding with poll creation
         fee: Mas.fromString('0.01'), // Use same fee format as working implementation
       });
 
@@ -337,7 +376,16 @@ export class PollsContract {
         isActive: true,
         createdAt: Date.now(),
         endTime: Date.now() + (7 * 24 * 60 * 60 * 1000), // Default 7 days from now
-        status: 'active' as const
+        status: 'active' as const,
+        projectId: 0,
+        rewardPool: 0,
+        fundingType: 0,
+        distributionMode: 0,
+        distributionType: 0,
+        fixedRewardAmount: 0,
+        fundingGoal: 0,
+        treasuryApproved: false,
+        rewardsDistributed: false
       };
     } catch (error) {
       console.error("Error fetching poll:", error);
@@ -351,7 +399,7 @@ export class PollsContract {
     try {
       console.log(`🔍 Parsing poll data: "${pollDataStr.substring(0, 150)}${pollDataStr.length > 150 ? '...' : ''}"`);
 
-      // Format: id|title|description|option1||option2||option3|creator|startTime|endTime|status|voteCount
+      // Format: id|title|description|option1||option2||option3|creator|startTime|endTime|status|voteCount|projectId|rewardPool|fundingType|distributionMode|distributionType|fixedRewardAmount|fundingGoal|treasuryApproved|rewardsDistributed
       const parts = pollDataStr.split('|');
 
       if (parts.length < 8) {
@@ -384,8 +432,30 @@ export class PollsContract {
       const creator = parts[creatorIndex];
       const startTime = parseInt(parts[creatorIndex + 1]);
       const endTime = parseInt(parts[creatorIndex + 2]);
-      const status = parseInt(parts[creatorIndex + 3]);
+      const contractStatus = parseInt(parts[creatorIndex + 3]); // 0=ACTIVE, 1=CLOSED, 2=ENDED
       const voteCountStr = parts[creatorIndex + 4] || '';
+
+      console.log(`🔍 Parsing economics fields from index ${creatorIndex + 5}:`);
+      console.log(`   Total parts: ${parts.length}`);
+      console.log(`   Parts after votes: [${parts.slice(creatorIndex + 5).join(', ')}]`);
+
+      // Parse economics fields (with backward compatibility)
+      const projectId = parts.length > creatorIndex + 5 ? parseInt(parts[creatorIndex + 5]) || 0 : 0;
+      const rewardPool = parts.length > creatorIndex + 6 ? parseInt(parts[creatorIndex + 6]) || 0 : 0;
+      const fundingType = parts.length > creatorIndex + 7 ? parseInt(parts[creatorIndex + 7]) || 0 : 0;
+      const distributionMode = parts.length > creatorIndex + 8 ? parseInt(parts[creatorIndex + 8]) || 0 : 0;
+      const distributionType = parts.length > creatorIndex + 9 ? parseInt(parts[creatorIndex + 9]) || 0 : 0;
+      const fixedRewardAmount = parts.length > creatorIndex + 10 ? parseInt(parts[creatorIndex + 10]) || 0 : 0;
+      const fundingGoal = parts.length > creatorIndex + 11 ? parseInt(parts[creatorIndex + 11]) || 0 : 0;
+      const treasuryApproved = parts.length > creatorIndex + 12 ? parts[creatorIndex + 12] === 'true' : false;
+      const rewardsDistributed = parts.length > creatorIndex + 13 ? parts[creatorIndex + 13] === 'true' : false;
+
+      console.log(`📊 Parsed economics fields:`);
+      console.log(`   projectId: ${projectId} (raw: "${parts[creatorIndex + 5] || 'undefined'}")`);
+      console.log(`   rewardPool: ${rewardPool} (raw: "${parts[creatorIndex + 6] || 'undefined'}")`);
+      console.log(`   fundingType: ${fundingType} (raw: "${parts[creatorIndex + 7] || 'undefined'}")`);
+      console.log(`   treasuryApproved: ${treasuryApproved} (raw: "${parts[creatorIndex + 12] || 'undefined'}")`);
+      console.log(`   rewardsDistributed: ${rewardsDistributed} (raw: "${parts[creatorIndex + 13] || 'undefined'}")`);
 
       // Parse vote counts (comma-separated)
       const votes = voteCountStr.length > 0 ?
@@ -397,20 +467,29 @@ export class PollsContract {
         votes.push(0);
       }
 
-      // Determine if poll is active
-      // NOTE: Contract uses Context.timestamp() which returns SECONDS, not milliseconds
-      // We need to convert our millisecond timestamps to seconds for comparison
+      // Determine if poll is active based on contract status and time
+      // NOTE: Context.timestamp() in Massa returns MILLISECONDS, not seconds (despite what comments say)
+      // Contract status: 0=ACTIVE, 1=CLOSED (manually closed), 2=ENDED (time expired)
       const currentTimeMs = Date.now();
-      const currentTimeSec = Math.floor(currentTimeMs / 1000);
-      const endTimeSec = Math.floor(endTime / 1000);
-      const isActive = status === 0 && currentTimeSec < endTimeSec;
-      
+      const isActive = contractStatus === 0 && currentTimeMs >= startTime && currentTimeMs < endTime;
+
+      // Determine display status
+      let displayStatus: 'active' | 'closed' | 'ended' = 'active';
+      if (contractStatus === 1) {
+        displayStatus = 'closed';
+      } else if (contractStatus === 2 || currentTimeMs >= endTime) {
+        displayStatus = 'ended';
+      } else if (contractStatus === 0 && currentTimeMs >= startTime && currentTimeMs < endTime) {
+        displayStatus = 'active';
+      }
+
       console.log(`⏰ Timestamp Analysis:`);
-      console.log(`   Current Time (ms): ${currentTimeMs}`);
-      console.log(`   Current Time (sec): ${currentTimeSec}`);
-      console.log(`   End Time (ms): ${endTime}`);
-      console.log(`   End Time (sec): ${endTimeSec}`);
-      console.log(`   Time comparison (sec): ${currentTimeSec} < ${endTimeSec} = ${currentTimeSec < endTimeSec}`);
+      console.log(`   Current Time (ms): ${currentTimeMs} (${new Date(currentTimeMs).toLocaleString()})`);
+      console.log(`   Start Time (ms): ${startTime} (${new Date(startTime).toLocaleString()})`);
+      console.log(`   End Time (ms): ${endTime} (${new Date(endTime).toLocaleString()})`);
+      console.log(`   Contract Status: ${contractStatus} (0=ACTIVE, 1=CLOSED, 2=ENDED)`);
+      console.log(`   Time until end: ${((endTime - currentTimeMs) / 1000).toFixed(0)} seconds (${((endTime - currentTimeMs) / 3600000).toFixed(2)} hours)`);
+      console.log(`   Time comparison: ${currentTimeMs} >= ${startTime} && ${currentTimeMs} < ${endTime} = ${currentTimeMs >= startTime && currentTimeMs < endTime}`);
 
       console.log(`📊 Successfully parsed poll:`);
       console.log(`   ID: ${id}`);
@@ -418,14 +497,15 @@ export class PollsContract {
       console.log(`   Description: "${description}"`);
       console.log(`   Options: [${options.map(opt => `"${opt}"`).join(', ')}]`);
       console.log(`   Creator: ${creator}`);
-      console.log(`   Start Time: ${new Date(startTime).toLocaleString()} (${startTime})`);
-      console.log(`   End Time: ${new Date(endTime).toLocaleString()} (${endTime})`);
-      console.log(`   Current Time: ${new Date(currentTimeMs).toLocaleString()} (${currentTimeMs})`);
-      console.log(`   Raw Status: ${status}`);
-      console.log(`   Status Check: status === 0 ? ${status === 0}`);
-      console.log(`   Time Check: currentTimeSec < endTimeSec ? ${currentTimeSec < endTimeSec}`);
+      console.log(`   Start Time: ${new Date(startTime).toLocaleString()} (${startTime} ms)`);
+      console.log(`   End Time: ${new Date(endTime).toLocaleString()} (${endTime} ms)`);
+      console.log(`   Current Time: ${new Date(currentTimeMs).toLocaleString()} (${currentTimeMs} ms)`);
       console.log(`   Final Active Status: ${isActive ? 'Active' : 'Inactive'}`);
+      console.log(`   Display Status: ${displayStatus}`);
       console.log(`   Votes: [${votes.join(', ')}]`);
+      console.log(`   Reward Pool: ${rewardPool} nanoMASSA`);
+      console.log(`   Funding Type: ${fundingType}`);
+      console.log(`   Distribution Mode: ${distributionMode}`);
 
       return {
         id,
@@ -435,9 +515,18 @@ export class PollsContract {
         creator,
         votes,
         isActive,
-        createdAt: startTime,
-        endTime: endTime,
-        status: isActive ? 'active' as const : 'ended' as const
+        createdAt: startTime, // Already in milliseconds from contract
+        endTime: endTime, // Already in milliseconds from contract
+        status: displayStatus,
+        projectId,
+        rewardPool,
+        fundingType,
+        distributionMode,
+        distributionType,
+        fixedRewardAmount,
+        fundingGoal,
+        treasuryApproved,
+        rewardsDistributed
       };
     } catch (error) {
       console.error('💥 Error parsing poll data:', error);
@@ -747,6 +836,208 @@ export class PollsContract {
     }
   }
 
+  // ================= AUTONOMOUS SC METHODS =================
+
+  async enableAutonomous(): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("🤖 Enabling autonomous SC execution");
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "enableAutonomous",
+        parameter: new Args().serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Autonomous SC enabled!");
+      return true;
+    } catch (error) {
+      console.error("Error enabling autonomous:", error);
+      throw new Error(`Failed to enable autonomous SC: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async disableAutonomous(): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("🤖 Disabling autonomous SC execution");
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "disableAutonomous",
+        parameter: new Args().serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Autonomous SC disabled!");
+      return true;
+    } catch (error) {
+      console.error("Error disabling autonomous:", error);
+      throw new Error(`Failed to disable autonomous SC: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async isAutonomousEnabled(): Promise<boolean> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "isAutonomousEnabled",
+        parameter: new Args().serialize(),
+      });
+
+      // Get events
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      const enabledEvents = events.filter(event =>
+        event.data.includes("Autonomous SC enabled:")
+      );
+
+      if (enabledEvents.length > 0) {
+        const latestEvent = enabledEvents[enabledEvents.length - 1];
+        return latestEvent.data.includes(": true");
+      }
+
+      return false;
+    } catch (error) {
+      console.error("Error checking autonomous status:", error);
+      return false;
+    }
+  }
+
+  async setAutonomousInterval(intervalSeconds: number): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log(`🤖 Setting autonomous interval to ${intervalSeconds} seconds`);
+
+      const args = new Args().addU64(BigInt(intervalSeconds));
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "setAutonomousInterval",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Autonomous interval updated!");
+      return true;
+    } catch (error) {
+      console.error("Error setting autonomous interval:", error);
+      throw new Error(`Failed to set interval: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getAutonomousInterval(): Promise<number> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "getAutonomousInterval",
+        parameter: new Args().serialize(),
+      });
+
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      const intervalEvents = events.filter(event =>
+        event.data.includes("Autonomous SC interval:")
+      );
+
+      if (intervalEvents.length > 0) {
+        const latestEvent = intervalEvents[intervalEvents.length - 1];
+        const match = latestEvent.data.match(/interval: (\d+) seconds/);
+        if (match) {
+          return parseInt(match[1]);
+        }
+      }
+
+      return 3600; // Default 1 hour
+    } catch (error) {
+      console.error("Error getting autonomous interval:", error);
+      return 3600;
+    }
+  }
+
+  async getLastAutonomousRun(): Promise<number> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "getLastAutonomousRun",
+        parameter: new Args().serialize(),
+      });
+
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      const runEvents = events.filter(event =>
+        event.data.includes("Last autonomous run:")
+      );
+
+      if (runEvents.length > 0) {
+        const latestEvent = runEvents[runEvents.length - 1];
+        const match = latestEvent.data.match(/run: (\d+)/);
+        if (match) {
+          return parseInt(match[1]);
+        }
+      }
+
+      return 0;
+    } catch (error) {
+      console.error("Error getting last autonomous run:", error);
+      return 0;
+    }
+  }
+
+  async manualTriggerDistribution(pollId: string): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log(`🤖 Manually triggering distribution for poll ${pollId}`);
+
+      const args = new Args().addString(pollId);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "manualTriggerDistribution",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Manual distribution triggered!");
+      return true;
+    } catch (error) {
+      console.error("Error triggering manual distribution:", error);
+      throw new Error(`Failed to trigger distribution: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   // Admin function to fund the contract
   async fundContract(amountInMassa: number): Promise<boolean> {
     if (!this.account) {
@@ -778,6 +1069,207 @@ export class PollsContract {
     } catch (error) {
       console.error("Error funding contract:", error);
       throw new Error(`Failed to fund contract: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // ================= POLL FUNDING & REWARD METHODS =================
+
+  async fundPoll(pollId: string, amountInMassa: number): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("💰 Funding poll with parameters:", {
+        pollId,
+        amount: `${amountInMassa} MASSA`,
+        contractAddress: this.contractAddress
+      });
+
+      // Convert MASSA to nanoMASSA
+      const amountInNano = BigInt(Math.floor(amountInMassa * 1e9));
+
+      const args = new Args().addString(pollId);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "fundPoll",
+        parameter: args.serialize(),
+        coins: amountInNano, // Send funds with transaction
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("💸 Poll funding transaction result:", result);
+      return true;
+    } catch (error) {
+      console.error("Error funding poll:", error);
+      throw new Error(`Failed to fund poll: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async claimReward(pollId: string): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("🎁 Claiming reward from poll:", pollId);
+
+      const args = new Args().addString(pollId);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "claimReward",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Reward claim transaction successful!", result);
+      return true;
+    } catch (error) {
+      console.error("Error claiming reward:", error);
+      throw new Error(`Failed to claim reward: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async distributeRewards(pollId: string): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("📤 Distributing rewards for poll:", pollId);
+
+      const args = new Args().addString(pollId);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "distributeRewards",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Reward distribution transaction successful!", result);
+      return true;
+    } catch (error) {
+      console.error("Error distributing rewards:", error);
+      throw new Error(`Failed to distribute rewards: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getPoolBalance(pollId: string): Promise<number> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      const args = new Args().addString(pollId);
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "getPoolBalance",
+        parameter: args.serialize(),
+      });
+
+      // Get events to parse the balance
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      const balanceEvents = events.filter(event =>
+        event.data.includes(`Poll ${pollId} reward pool balance:`)
+      );
+
+      if (balanceEvents.length > 0) {
+        const latestEvent = balanceEvents[balanceEvents.length - 1];
+        const match = latestEvent.data.match(/balance: (\d+) nanoMASSA/);
+        if (match) {
+          const balanceInNano = parseFloat(match[1]);
+          return balanceInNano / 1e9; // Convert to MASSA
+        }
+      }
+
+      return 0;
+    } catch (error) {
+      console.error("Error getting pool balance:", error);
+      return 0;
+    }
+  }
+
+  async getContribution(pollId: string, contributor: string): Promise<number> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      const args = new Args()
+        .addString(pollId)
+        .addString(contributor);
+
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "getContribution",
+        parameter: args.serialize(),
+      });
+
+      // Get events to parse the contribution
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      const contributionEvents = events.filter(event =>
+        event.data.includes(`Contributor ${contributor} contributed`) &&
+        event.data.includes(`to poll ${pollId}`)
+      );
+
+      if (contributionEvents.length > 0) {
+        const latestEvent = contributionEvents[contributionEvents.length - 1];
+        const match = latestEvent.data.match(/contributed (\d+) nanoMASSA/);
+        if (match) {
+          const contributionInNano = parseFloat(match[1]);
+          return contributionInNano / 1e9; // Convert to MASSA
+        }
+      }
+
+      return 0;
+    } catch (error) {
+      console.error("Error getting contribution:", error);
+      return 0;
+    }
+  }
+
+  async hasClaimed(pollId: string, voterAddress: string): Promise<boolean> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      const args = new Args()
+        .addString(pollId)
+        .addString(voterAddress);
+
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "hasClaimed",
+        parameter: args.serialize(),
+      });
+
+      // Get events to check claimed status
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      const claimedEvents = events.filter(event =>
+        event.data.includes(`Voter ${voterAddress} has claimed reward for poll ${pollId}:`)
+      );
+
+      if (claimedEvents.length > 0) {
+        const latestEvent = claimedEvents[claimedEvents.length - 1];
+        return latestEvent.data.includes(": true");
+      }
+
+      return false;
+    } catch (error) {
+      console.error("Error checking claimed status:", error);
+      return false;
     }
   }
 
@@ -844,6 +1336,42 @@ export class PollsContract {
     }
   }
 
+  async updateProject(projectId: string, params: ProjectCreationParams): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("🔄 Updating project", projectId, "with parameters:", {
+        name: params.name,
+        description: params.description
+      });
+
+      const args = new Args()
+        .addString(projectId)
+        .addString(params.name)
+        .addString(params.description);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "updateProject",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Project update transaction successful!");
+
+      // Wait for transaction to process
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      return true;
+    } catch (error) {
+      console.error("Error updating project:", error);
+      throw new Error(`Failed to update project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   async getAllProjects(): Promise<ContractProject[]> {
     console.log('📁 Fetching All Projects');
 
@@ -896,8 +1424,7 @@ export class PollsContract {
 
       console.log(`📁 Found ${projectEvents.length} project events using flexible patterns`);
 
-      const projects: ContractProject[] = [];
-      const processedIds = new Set<string>();
+      const projectsMap = new Map<string, ContractProject>();
 
       for (const event of projectEvents) {
         try {
@@ -914,7 +1441,8 @@ export class PollsContract {
               const projectId = match[1];
               const creator = match[2];
 
-              if (!processedIds.has(projectId)) {
+              // Only use fallback if we don't already have this project
+              if (!projectsMap.has(projectId)) {
                 // Create a basic project object from the notification
                 const basicProject: ContractProject = {
                   id: projectId,
@@ -925,9 +1453,8 @@ export class PollsContract {
                   pollIds: []
                 };
 
-                projects.push(basicProject);
-                processedIds.add(projectId);
-                console.log(`⚠️ Using fallback data for project #${projectId} (contract not emitting full data)`);
+                projectsMap.set(projectId, basicProject);
+                console.log(`⚠️ Using fallback data for project #${projectId} (will be updated if full data is found)`);
               }
             }
             continue;
@@ -940,9 +1467,9 @@ export class PollsContract {
           }
 
           const project = this.parseProjectData(projectDataStr);
-          if (project && !processedIds.has(project.id)) {
-            projects.push(project);
-            processedIds.add(project.id);
+          if (project) {
+            // Always overwrite with full data (this replaces fallback data)
+            projectsMap.set(project.id, project);
             console.log(`✅ Successfully parsed project #${project.id}: "${project.name}"`);
           }
         } catch (parseError) {
@@ -952,7 +1479,8 @@ export class PollsContract {
         }
       }
 
-      projects.sort((a, b) => parseInt(b.id) - parseInt(a.id));
+      // Convert map to array and sort by ID (newest first)
+      const projects = Array.from(projectsMap.values()).sort((a, b) => parseInt(b.id) - parseInt(a.id));
 
       console.log(`\n✅ Project retrieval completed! Found ${projects.length} projects`);
 
@@ -1014,32 +1542,6 @@ export class PollsContract {
     }
   }
 
-  async updateProject(projectId: string, newName: string, newDescription: string): Promise<boolean> {
-    if (!this.account) {
-      throw new Error("Wallet not connected. Please connect your wallet first.");
-    }
-
-    try {
-      const args = new Args()
-        .addString(projectId)
-        .addString(newName)
-        .addString(newDescription);
-
-      const result = await this.account.callSC({
-        target: this.contractAddress,
-        func: "updateProject",
-        parameter: args.serialize(),
-        coins: 0n,
-        fee: Mas.fromString('0.01'),
-      });
-
-      console.log("✅ Project update transaction result:", result);
-      return true;
-    } catch (error) {
-      console.error("Error updating project:", error);
-      throw new Error(`Failed to update project: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
 
   async deleteProject(projectId: string): Promise<boolean> {
     if (!this.account) {
@@ -1116,6 +1618,134 @@ export class PollsContract {
     } catch (error) {
       console.error("Error fetching polls by project:", error);
       return [];
+    }
+  }
+
+  // ============= TREASURY FUNCTIONS =============
+
+  async approveTreasuryPoll(pollId: string, fundingAmount: number = 0): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log(`✅ Approving treasury poll ${pollId}${fundingAmount > 0 ? ` with ${fundingAmount} MASSA funding` : ''}`);
+
+      const args = new Args().addString(pollId);
+      const coins = fundingAmount > 0 ? BigInt(Math.floor(fundingAmount * 1e9)) : 0n;
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "approveTreasuryPoll",
+        parameter: args.serialize(),
+        coins,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Treasury poll approved!");
+      return true;
+    } catch (error) {
+      console.error("Error approving treasury poll:", error);
+      throw new Error(`Failed to approve poll: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async rejectTreasuryPoll(pollId: string): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log(`❌ Rejecting treasury poll ${pollId}`);
+
+      const args = new Args().addString(pollId);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "rejectTreasuryPoll",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Treasury poll rejected!");
+      return true;
+    } catch (error) {
+      console.error("Error rejecting treasury poll:", error);
+      throw new Error(`Failed to reject poll: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getPendingTreasuryPolls(): Promise<string[]> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "getPendingTreasuryPolls",
+        parameter: new Uint8Array(),
+      });
+
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      const pendingEvents = events.filter(event =>
+        event.data.includes("Pending treasury polls:")
+      );
+
+      if (pendingEvents.length > 0) {
+        const latestEvent = pendingEvents[pendingEvents.length - 1];
+        const dataMatch = latestEvent.data.match(/Pending treasury polls: (.*)/);
+        if (dataMatch && dataMatch[1] && dataMatch[1].trim() !== '') {
+          return dataMatch[1].split(',').map(id => id.trim());
+        }
+      }
+
+      return [];
+    } catch (error) {
+      console.error("Error fetching pending treasury polls:", error);
+      return [];
+    }
+  }
+
+  async getTreasuryApprovalStatus(pollId: string): Promise<{ fundingType: string; status: string }> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      const args = new Args().addString(pollId);
+
+      await provider.readSC({
+        target: this.contractAddress,
+        func: "getTreasuryApprovalStatus",
+        parameter: args.serialize(),
+      });
+
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      const statusEvents = events.filter(event =>
+        event.data.includes(`Poll ${pollId} - Funding type:`)
+      );
+
+      if (statusEvents.length > 0) {
+        const latestEvent = statusEvents[statusEvents.length - 1];
+        const fundingTypeMatch = latestEvent.data.match(/Funding type: (\w+)/);
+        const statusMatch = latestEvent.data.match(/Approval status: (\w+)/);
+
+        return {
+          fundingType: fundingTypeMatch ? fundingTypeMatch[1] : 'unknown',
+          status: statusMatch ? statusMatch[1] : 'unknown',
+        };
+      }
+
+      return { fundingType: 'unknown', status: 'unknown' };
+    } catch (error) {
+      console.error("Error getting treasury approval status:", error);
+      return { fundingType: 'unknown', status: 'unknown' };
     }
   }
 }

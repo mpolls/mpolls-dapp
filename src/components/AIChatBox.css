@@ -1,0 +1,322 @@
+.ai-chatbox {
+  display: flex;
+  flex-direction: column;
+  height: 600px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.ai-chatbox-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #e0e0e0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 8px 8px 0 0;
+}
+
+.ai-chatbox-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.ai-chatbox-reset-btn {
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.ai-chatbox-reset-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.ai-chatbox-reset-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ai-chatbox-error {
+  padding: 24px;
+  text-align: center;
+  color: #d32f2f;
+}
+
+.ai-chatbox-error code {
+  display: block;
+  margin-top: 12px;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  color: #333;
+}
+
+.ai-chatbox-error-banner {
+  padding: 12px 16px;
+  background: #ffebee;
+  color: #c62828;
+  border-bottom: 1px solid #ef9a9a;
+  font-size: 14px;
+}
+
+.ai-chatbox-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: #f9f9f9;
+}
+
+.ai-chatbox-suggestions {
+  text-align: center;
+  padding: 24px;
+}
+
+.ai-chatbox-suggestions p {
+  margin-bottom: 16px;
+  color: #666;
+  font-size: 14px;
+}
+
+.ai-suggestion-btn {
+  display: block;
+  width: 100%;
+  margin: 8px 0;
+  padding: 12px 16px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.ai-suggestion-btn:hover:not(:disabled) {
+  background: #f5f5f5;
+  border-color: #667eea;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.ai-suggestion-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ai-message {
+  display: flex;
+  margin-bottom: 16px;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ai-message-user {
+  flex-direction: row-reverse;
+}
+
+.ai-message-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.ai-message-user .ai-message-avatar {
+  margin-left: 12px;
+}
+
+.ai-message-assistant .ai-message-avatar {
+  margin-right: 12px;
+}
+
+.ai-message-content {
+  max-width: 70%;
+}
+
+.ai-message-text {
+  padding: 12px 16px;
+  border-radius: 12px;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+.ai-message-user .ai-message-text {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.ai-message-assistant .ai-message-text {
+  background: white;
+  border: 1px solid #e0e0e0;
+  color: #333;
+  border-bottom-left-radius: 4px;
+}
+
+.ai-typing-indicator {
+  padding: 12px 16px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  border-bottom-left-radius: 4px;
+  display: flex;
+  gap: 4px;
+}
+
+.ai-typing-indicator span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #999;
+  animation: typing 1.4s infinite;
+}
+
+.ai-typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.ai-typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.7;
+  }
+  30% {
+    transform: translateY(-10px);
+    opacity: 1;
+  }
+}
+
+.ai-chatbox-ready {
+  padding: 16px;
+  background: #e8f5e9;
+  border-top: 1px solid #a5d6a7;
+  border-bottom: 1px solid #a5d6a7;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ai-chatbox-ready-message {
+  color: #2e7d32;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.ai-chatbox-create-btn {
+  padding: 10px 24px;
+  background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.ai-chatbox-create-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(67, 160, 71, 0.4);
+}
+
+.ai-chatbox-input {
+  display: flex;
+  gap: 8px;
+  padding: 16px;
+  background: white;
+  border-top: 1px solid #e0e0e0;
+  border-radius: 0 0 8px 8px;
+}
+
+.ai-chatbox-input textarea {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: none;
+  transition: border-color 0.2s;
+}
+
+.ai-chatbox-input textarea:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.ai-chatbox-input textarea:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.ai-chatbox-send-btn {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  align-self: flex-end;
+}
+
+.ai-chatbox-send-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.ai-chatbox-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Scrollbar styling */
+.ai-chatbox-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ai-chatbox-messages::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.ai-chatbox-messages::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.ai-chatbox-messages::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

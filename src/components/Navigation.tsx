@@ -5,10 +5,11 @@ import PollIcon from '@mui/icons-material/Poll';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import SettingsIcon from '@mui/icons-material/Settings';
 import FolderIcon from '@mui/icons-material/Folder';
+import TokenIcon from '@mui/icons-material/Token';
 
 interface NavigationProps {
-  onNavigate: (page: 'home' | 'polls' | 'create' | 'admin' | 'projects') => void;
-  currentPage: 'home' | 'polls' | 'create' | 'admin' | 'projects';
+  onNavigate: (page: 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token') => void;
+  currentPage: 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token';
   onScrollToSection?: (sectionId: string) => void;
 }
 
@@ -104,6 +105,16 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, currentPage, onScro
               <AddCircleIcon sx={{ fontSize: 24 }} />
             </div>
             <span className="bottom-nav-label">Create</span>
+          </button>
+
+          <button
+            className={`bottom-nav-item ${currentPage === 'token' ? 'active' : ''}`}
+            onClick={() => onNavigate('token')}
+          >
+            <div className="bottom-nav-icon">
+              <TokenIcon sx={{ fontSize: 24 }} />
+            </div>
+            <span className="bottom-nav-label">Tokens</span>
           </button>
 
           <button

@@ -6,24 +6,38 @@ import LinkIcon from '@mui/icons-material/Link';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import FolderIcon from '@mui/icons-material/Folder';
+import { AIChatBox } from './components/AIChatBox';
+import { PollParameters } from './api/openai';
 
 interface CreatePollProps {
   onBack: () => void;
 }
 
 const CreatePoll = ({ onBack }: CreatePollProps) => {
+  // Calculate default end date/time (7 days from now)
+  const getDefaultEndDateTime = () => {
+    const date = new Date();
+    date.setDate(date.getDate() + 7);
+    return date.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:mm
+  };
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     options: ["", ""],
-    duration: 7, // days
-    entryFee: 0,
-    votingFee: 0,
-    rewardPool: 0,
+    duration: 7, // days (kept for backward compatibility, will be calculated from endDateTime)
+    endDateTime: getDefaultEndDateTime(), // New field for date/time picker
     allowList: "",
     contestType: "open" as "open" | "allowlist",
     viewType: "text" as "text" | "gallery",
-    projectId: 0 // 0 means no project assigned
+    projectId: 0, // 0 means no project assigned
+    // New economics fields
+    fundingType: "self" as "self" | "community" | "treasury",
+    distributionMode: "equal" as "equal" | "fixed" | "weighted",
+    distributionType: "manual-pull" as "manual-pull" | "manual-push" | "autonomous",
+    rewardPool: 0, // Initial reward pool amount
+    fixedRewardAmount: 0, // For fixed reward mode
+    fundingGoal: 0 // For community-funded polls
   });
 
   const [isCreating, setIsCreating] = useState(false);
@@ -35,10 +49,22 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [projects, setProjects] = useState<ContractProject[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [creationMode, setCreationMode] = useState<'form' | 'ai-chat'>('form');
 
   useEffect(() => {
     checkWalletConnection();
     loadProjects();
+
+    // Check if there's a pre-selected project from sessionStorage
+    const selectedProjectId = sessionStorage.getItem('selectedProjectId');
+    if (selectedProjectId) {
+      setFormData(prev => ({
+        ...prev,
+        projectId: parseInt(selectedProjectId)
+      }));
+      // Clear from sessionStorage after reading
+      sessionStorage.removeItem('selectedProjectId');
+    }
   }, []);
 
   const loadProjects = async () => {
@@ -123,6 +149,30 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
     return "";
   };
 
+  const handleAIPollReady = (params: PollParameters) => {
+    // Populate form data from AI-extracted parameters
+    setFormData(prev => ({
+      ...prev,
+      title: params.title || "",
+      description: params.description || "",
+      options: params.options || ["", ""],
+      duration: params.duration || 7,
+      fundingType: (params.fundingType || "self") as "self" | "community" | "treasury",
+      distributionMode: (params.distributionMode || "equal") as "equal" | "fixed" | "weighted",
+      distributionType: (params.distributionType || "manual-pull") as "manual-pull" | "manual-push" | "autonomous",
+      rewardPool: params.rewardPool || 0,
+      fixedRewardAmount: params.fixedRewardAmount || 0,
+      fundingGoal: params.fundingGoal || 0,
+    }));
+
+    // Switch to form mode to review and submit
+    setCreationMode('form');
+    setSuccess("Poll parameters loaded from AI! Review and submit below.");
+
+    // Scroll to top of form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const createPoll = async () => {
     const validationError = validateForm();
     if (validationError) {
@@ -140,16 +190,36 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
     setSuccess("");
 
     try {
-      // Prepare contract call parameters
-      const durationInSeconds = formData.duration * 24 * 60 * 60; // Convert days to seconds
+      // Calculate duration from endDateTime
+      const endDate = new Date(formData.endDateTime);
+      const now = new Date();
+      const durationInSeconds = Math.floor((endDate.getTime() - now.getTime()) / 1000); // Convert milliseconds to seconds
+
+      if (durationInSeconds <= 0) {
+        setError("End date/time must be in the future");
+        setIsCreating(false);
+        return;
+      }
+
       const filteredOptions = formData.options.filter(opt => opt.trim());
+
+      // Map frontend values to contract enum values
+      const fundingTypeMap = { "self": 0, "community": 1, "treasury": 2 };
+      const distributionModeMap = { "equal": 0, "fixed": 1, "weighted": 2 };
+      const distributionTypeMap = { "manual-pull": 0, "manual-push": 1, "autonomous": 2 };
 
       const pollParams: PollCreationParams = {
         title: formData.title,
         description: formData.description,
         options: filteredOptions,
         durationInSeconds,
-        projectId: formData.projectId > 0 ? formData.projectId : undefined
+        projectId: formData.projectId > 0 ? formData.projectId : undefined,
+        fundingType: fundingTypeMap[formData.fundingType],
+        distributionMode: distributionModeMap[formData.distributionMode],
+        distributionType: distributionTypeMap[formData.distributionType],
+        fixedRewardAmount: formData.fixedRewardAmount,
+        fundingGoal: formData.fundingGoal,
+        rewardPoolAmount: formData.rewardPool // Initial funding for self-funded polls
       };
       console.log("🚀 Creating poll with parameters:", pollParams);
 
@@ -157,20 +227,24 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
       const pollId = await pollsContract.createPoll(pollParams);
 
       setSuccess(`Poll created successfully! Poll ID: ${pollId}. Redirecting to polls list...`);
-      
+
       // Reset form
       setFormData({
         title: "",
         description: "",
         options: ["", ""],
         duration: 7,
-        entryFee: 0,
-        votingFee: 0,
-        rewardPool: 0,
+        endDateTime: getDefaultEndDateTime(),
         allowList: "",
         contestType: "open",
         viewType: "text",
-        projectId: 0
+        projectId: 0,
+        fundingType: "self",
+        distributionMode: "equal",
+        distributionType: "manual-pull",
+        rewardPool: 0,
+        fixedRewardAmount: 0,
+        fundingGoal: 0
       });
 
       // Redirect to polls list after a short delay to show the success message
@@ -197,7 +271,33 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
         <div className="create-poll-content">
           <h1>Create New Poll</h1>
           <p className="subtitle">Design your decentralized poll or contest on the Massa blockchain</p>
-          
+
+          {/* Creation Mode Tabs */}
+          <div className="creation-mode-tabs">
+            <button
+              className={`mode-tab ${creationMode === 'form' ? 'active' : ''}`}
+              onClick={() => setCreationMode('form')}
+            >
+              Manual Form
+            </button>
+            <button
+              className={`mode-tab ${creationMode === 'ai-chat' ? 'active' : ''}`}
+              onClick={() => setCreationMode('ai-chat')}
+            >
+              AI Chat
+            </button>
+          </div>
+
+          {/* AI Chat Mode */}
+          {creationMode === 'ai-chat' && (
+            <div className="ai-chat-mode">
+              <AIChatBox onPollParametersReady={handleAIPollReady} />
+            </div>
+          )}
+
+          {/* Manual Form Mode */}
+          {creationMode === 'form' && (
+            <>
           {/* Contract Address Display */}
           <div className="contract-info">
             <h3><PlaceIcon sx={{ fontSize: 20, marginRight: 0.5, verticalAlign: 'middle' }} /> Contract Information</h3>
@@ -416,64 +516,199 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
               )}
             </div>
 
-            {/* Duration & Fees */}
+            {/* Duration & Economics */}
             <div className="form-section">
               <h2>Duration & Economics</h2>
-              
+
               <div className="form-group">
-                <label htmlFor="duration">Poll Duration (days) *</label>
+                <label htmlFor="endDateTime">Poll End Date & Time *</label>
                 <input
-                  type="number"
-                  id="duration"
-                  value={formData.duration}
-                  onChange={(e) => setFormData(prev => ({ ...prev, duration: parseInt(e.target.value) || 1 }))}
-                  min="1"
-                  max="365"
+                  type="datetime-local"
+                  id="endDateTime"
+                  value={formData.endDateTime}
+                  onChange={(e) => setFormData(prev => ({ ...prev, endDateTime: e.target.value }))}
+                  min={new Date().toISOString().slice(0, 16)}
                 />
+                <small>
+                  {formData.endDateTime ? (
+                    <>
+                      Poll will end on <strong>{new Date(formData.endDateTime).toLocaleString()}</strong>
+                      {' '}({Math.max(0, Math.floor((new Date(formData.endDateTime).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} days,
+                      {' '}{Math.max(0, Math.floor(((new Date(formData.endDateTime).getTime() - Date.now()) % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)))} hours from now)
+                    </>
+                  ) : (
+                    'Select when the poll should end and stop accepting votes'
+                  )}
+                </small>
               </div>
 
               <div className="form-group">
-                <label htmlFor="entryFee">Entry Fee (MASSA)</label>
-                <input
-                  type="number"
-                  id="entryFee"
-                  value={formData.entryFee}
-                  onChange={(e) => setFormData(prev => ({ ...prev, entryFee: parseFloat(e.target.value) || 0 }))}
-                  min="0"
-                  step="0.001"
-                />
+                <label>Funding Type</label>
+                <div className="radio-group">
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="fundingType"
+                      value="self"
+                      checked={formData.fundingType === "self"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, fundingType: e.target.value as "self" | "community" | "treasury" }))}
+                    />
+                    <span>Self-Funded</span>
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="fundingType"
+                      value="community"
+                      checked={formData.fundingType === "community"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, fundingType: e.target.value as "self" | "community" | "treasury" }))}
+                    />
+                    <span>Community-Funded</span>
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="fundingType"
+                      value="treasury"
+                      checked={formData.fundingType === "treasury"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, fundingType: e.target.value as "self" | "community" | "treasury" }))}
+                    />
+                    <span>Treasury-Funded</span>
+                  </label>
+                </div>
+                <small>
+                  {formData.fundingType === "self" && "You can fund the poll after creation or during the poll lifetime"}
+                  {formData.fundingType === "community" && "Anyone can contribute funds to this poll before it ends"}
+                  {formData.fundingType === "treasury" && "Requires admin approval before poll can be funded"}
+                </small>
               </div>
+
+              {formData.fundingType === "self" && (
+                <div className="form-group">
+                  <label htmlFor="rewardPool">Initial Reward Pool (MASSA)</label>
+                  <input
+                    type="number"
+                    id="rewardPool"
+                    value={formData.rewardPool}
+                    onChange={(e) => setFormData(prev => ({ ...prev, rewardPool: parseFloat(e.target.value) || 0 }))}
+                    min="0"
+                    step="0.001"
+                  />
+                  <small>Optional: Add funds now or fund later</small>
+                </div>
+              )}
+
+              {formData.fundingType === "community" && (
+                <div className="form-group">
+                  <label htmlFor="fundingGoal">Funding Goal (MASSA)</label>
+                  <input
+                    type="number"
+                    id="fundingGoal"
+                    value={formData.fundingGoal}
+                    onChange={(e) => setFormData(prev => ({ ...prev, fundingGoal: parseFloat(e.target.value) || 0 }))}
+                    min="0"
+                    step="0.001"
+                  />
+                  <small>Target amount for community contributions</small>
+                </div>
+              )}
 
               <div className="form-group">
-                <label htmlFor="votingFee">Voting Fee (MASSA)</label>
-                <input
-                  type="number"
-                  id="votingFee"
-                  value={formData.votingFee}
-                  onChange={(e) => setFormData(prev => ({ ...prev, votingFee: parseFloat(e.target.value) || 0 }))}
-                  min="0"
-                  step="0.001"
-                />
+                <label>Distribution Mode</label>
+                <div className="radio-group">
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="distributionMode"
+                      value="equal"
+                      checked={formData.distributionMode === "equal"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, distributionMode: e.target.value as "equal" | "fixed" | "weighted" }))}
+                    />
+                    <span>Equal Split</span>
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="distributionMode"
+                      value="fixed"
+                      checked={formData.distributionMode === "fixed"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, distributionMode: e.target.value as "equal" | "fixed" | "weighted" }))}
+                    />
+                    <span>Fixed Reward</span>
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="distributionMode"
+                      value="weighted"
+                      checked={formData.distributionMode === "weighted"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, distributionMode: e.target.value as "equal" | "fixed" | "weighted" }))}
+                    />
+                    <span>Weighted Quality</span>
+                  </label>
+                </div>
+                <small>
+                  {formData.distributionMode === "equal" && "Reward pool split equally among all voters"}
+                  {formData.distributionMode === "fixed" && "Fixed amount per voter until pool depletes"}
+                  {formData.distributionMode === "weighted" && "Weighted by response quality (for surveys)"}
+                </small>
               </div>
+
+              {formData.distributionMode === "fixed" && (
+                <div className="form-group">
+                  <label htmlFor="fixedRewardAmount">Fixed Reward per Voter (MASSA)</label>
+                  <input
+                    type="number"
+                    id="fixedRewardAmount"
+                    value={formData.fixedRewardAmount}
+                    onChange={(e) => setFormData(prev => ({ ...prev, fixedRewardAmount: parseFloat(e.target.value) || 0 }))}
+                    min="0"
+                    step="0.001"
+                  />
+                  <small>Amount each voter receives (first-come, first-served)</small>
+                </div>
+              )}
 
               <div className="form-group">
-                <label htmlFor="rewardPool">Initial Reward Pool (MASSA)</label>
-                <input
-                  type="number"
-                  id="rewardPool"
-                  value={formData.rewardPool}
-                  onChange={(e) => setFormData(prev => ({ ...prev, rewardPool: parseFloat(e.target.value) || 0 }))}
-                  min="0"
-                  step="0.001"
-                />
-                <small>Optional: Add your own funds to the reward pool</small>
+                <label>Distribution Type</label>
+                <div className="radio-group">
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="distributionType"
+                      value="manual-pull"
+                      checked={formData.distributionType === "manual-pull"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, distributionType: e.target.value as "manual-pull" | "manual-push" | "autonomous" }))}
+                    />
+                    <span>Manual Pull</span>
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="distributionType"
+                      value="manual-push"
+                      checked={formData.distributionType === "manual-push"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, distributionType: e.target.value as "manual-pull" | "manual-push" | "autonomous" }))}
+                    />
+                    <span>Manual Push</span>
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="distributionType"
+                      value="autonomous"
+                      checked={formData.distributionType === "autonomous"}
+                      onChange={(e) => setFormData(prev => ({ ...prev, distributionType: e.target.value as "manual-pull" | "manual-push" | "autonomous" }))}
+                    />
+                    <span>Autonomous</span>
+                  </label>
+                </div>
+                <small>
+                  {formData.distributionType === "manual-pull" && "Voters claim their rewards after poll ends"}
+                  {formData.distributionType === "manual-push" && "You trigger reward distribution to all voters"}
+                  {formData.distributionType === "autonomous" && "Automatic distribution by smart contract when poll ends"}
+                </small>
               </div>
-            </div>
-
-            {/* Fee Split Info */}
-            <div className="fee-info">
-              <h3><AttachMoneyIcon sx={{ fontSize: 22, marginRight: 0.5, verticalAlign: 'middle' }} /> Revenue Split</h3>
-              <p>You keep <strong>70%</strong> of all fees collected. Massa Polls takes 30% to maintain the platform.</p>
             </div>
 
             {/* Submit */}
@@ -487,6 +722,8 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
               </button>
             </div>
           </form>
+            </>
+          )}
         </div>
       </div>
     </div>
