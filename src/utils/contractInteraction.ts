@@ -1877,8 +1877,8 @@ export class PollsContract {
 
       // Call approve function on token contract
       const args = new Args()
-        .add(this.contractAddress) // spender (polls contract)
-        .add(amountInSmallestUnit); // amount
+        .addString(this.contractAddress) // spender (polls contract)
+        .addU64(amountInSmallestUnit); // amount
 
       const result = await this.account.callSC({
         target: tokenContractAddress,
