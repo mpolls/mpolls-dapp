@@ -14,11 +14,19 @@ interface CreatePollProps {
 }
 
 const CreatePoll = ({ onBack }: CreatePollProps) => {
+  // Calculate default end date/time (7 days from now)
+  const getDefaultEndDateTime = () => {
+    const date = new Date();
+    date.setDate(date.getDate() + 7);
+    return date.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:mm
+  };
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     options: ["", ""],
-    duration: 7, // days
+    duration: 7, // days (kept for backward compatibility, will be calculated from endDateTime)
+    endDateTime: getDefaultEndDateTime(), // New field for date/time picker
     allowList: "",
     contestType: "open" as "open" | "allowlist",
     viewType: "text" as "text" | "gallery",
@@ -182,8 +190,17 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
     setSuccess("");
 
     try {
-      // Prepare contract call parameters
-      const durationInSeconds = formData.duration * 24 * 60 * 60; // Convert days to seconds
+      // Calculate duration from endDateTime
+      const endDate = new Date(formData.endDateTime);
+      const now = new Date();
+      const durationInSeconds = Math.floor((endDate.getTime() - now.getTime()) / 1000); // Convert milliseconds to seconds
+
+      if (durationInSeconds <= 0) {
+        setError("End date/time must be in the future");
+        setIsCreating(false);
+        return;
+      }
+
       const filteredOptions = formData.options.filter(opt => opt.trim());
 
       // Map frontend values to contract enum values
@@ -217,6 +234,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
         description: "",
         options: ["", ""],
         duration: 7,
+        endDateTime: getDefaultEndDateTime(),
         allowList: "",
         contestType: "open",
         viewType: "text",
@@ -503,15 +521,25 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
               <h2>Duration & Economics</h2>
 
               <div className="form-group">
-                <label htmlFor="duration">Poll Duration (days) *</label>
+                <label htmlFor="endDateTime">Poll End Date & Time *</label>
                 <input
-                  type="number"
-                  id="duration"
-                  value={formData.duration}
-                  onChange={(e) => setFormData(prev => ({ ...prev, duration: parseInt(e.target.value) || 1 }))}
-                  min="1"
-                  max="365"
+                  type="datetime-local"
+                  id="endDateTime"
+                  value={formData.endDateTime}
+                  onChange={(e) => setFormData(prev => ({ ...prev, endDateTime: e.target.value }))}
+                  min={new Date().toISOString().slice(0, 16)}
                 />
+                <small>
+                  {formData.endDateTime ? (
+                    <>
+                      Poll will end on <strong>{new Date(formData.endDateTime).toLocaleString()}</strong>
+                      {' '}({Math.max(0, Math.floor((new Date(formData.endDateTime).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} days,
+                      {' '}{Math.max(0, Math.floor(((new Date(formData.endDateTime).getTime() - Date.now()) % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)))} hours from now)
+                    </>
+                  ) : (
+                    'Select when the poll should end and stop accepting votes'
+                  )}
+                </small>
               </div>
 
               <div className="form-group">

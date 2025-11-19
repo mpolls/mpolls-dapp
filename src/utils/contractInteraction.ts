@@ -377,6 +377,7 @@ export class PollsContract {
         createdAt: Date.now(),
         endTime: Date.now() + (7 * 24 * 60 * 60 * 1000), // Default 7 days from now
         status: 'active' as const,
+        projectId: 0,
         rewardPool: 0,
         fundingType: 0,
         distributionMode: 0,
@@ -398,7 +399,7 @@ export class PollsContract {
     try {
       console.log(`🔍 Parsing poll data: "${pollDataStr.substring(0, 150)}${pollDataStr.length > 150 ? '...' : ''}"`);
 
-      // Format: id|title|description|option1||option2||option3|creator|startTime|endTime|status|voteCount
+      // Format: id|title|description|option1||option2||option3|creator|startTime|endTime|status|voteCount|projectId|rewardPool|fundingType|distributionMode|distributionType|fixedRewardAmount|fundingGoal|treasuryApproved|rewardsDistributed
       const parts = pollDataStr.split('|');
 
       if (parts.length < 8) {
@@ -431,8 +432,30 @@ export class PollsContract {
       const creator = parts[creatorIndex];
       const startTime = parseInt(parts[creatorIndex + 1]);
       const endTime = parseInt(parts[creatorIndex + 2]);
-      const status = parseInt(parts[creatorIndex + 3]);
+      const contractStatus = parseInt(parts[creatorIndex + 3]); // 0=ACTIVE, 1=CLOSED, 2=ENDED
       const voteCountStr = parts[creatorIndex + 4] || '';
+
+      console.log(`🔍 Parsing economics fields from index ${creatorIndex + 5}:`);
+      console.log(`   Total parts: ${parts.length}`);
+      console.log(`   Parts after votes: [${parts.slice(creatorIndex + 5).join(', ')}]`);
+
+      // Parse economics fields (with backward compatibility)
+      const projectId = parts.length > creatorIndex + 5 ? parseInt(parts[creatorIndex + 5]) || 0 : 0;
+      const rewardPool = parts.length > creatorIndex + 6 ? parseInt(parts[creatorIndex + 6]) || 0 : 0;
+      const fundingType = parts.length > creatorIndex + 7 ? parseInt(parts[creatorIndex + 7]) || 0 : 0;
+      const distributionMode = parts.length > creatorIndex + 8 ? parseInt(parts[creatorIndex + 8]) || 0 : 0;
+      const distributionType = parts.length > creatorIndex + 9 ? parseInt(parts[creatorIndex + 9]) || 0 : 0;
+      const fixedRewardAmount = parts.length > creatorIndex + 10 ? parseInt(parts[creatorIndex + 10]) || 0 : 0;
+      const fundingGoal = parts.length > creatorIndex + 11 ? parseInt(parts[creatorIndex + 11]) || 0 : 0;
+      const treasuryApproved = parts.length > creatorIndex + 12 ? parts[creatorIndex + 12] === 'true' : false;
+      const rewardsDistributed = parts.length > creatorIndex + 13 ? parts[creatorIndex + 13] === 'true' : false;
+
+      console.log(`📊 Parsed economics fields:`);
+      console.log(`   projectId: ${projectId} (raw: "${parts[creatorIndex + 5] || 'undefined'}")`);
+      console.log(`   rewardPool: ${rewardPool} (raw: "${parts[creatorIndex + 6] || 'undefined'}")`);
+      console.log(`   fundingType: ${fundingType} (raw: "${parts[creatorIndex + 7] || 'undefined'}")`);
+      console.log(`   treasuryApproved: ${treasuryApproved} (raw: "${parts[creatorIndex + 12] || 'undefined'}")`);
+      console.log(`   rewardsDistributed: ${rewardsDistributed} (raw: "${parts[creatorIndex + 13] || 'undefined'}")`);
 
       // Parse vote counts (comma-separated)
       const votes = voteCountStr.length > 0 ?
@@ -444,18 +467,29 @@ export class PollsContract {
         votes.push(0);
       }
 
-      // Determine if poll is active
-      // NOTE: Contract uses Context.timestamp() which returns SECONDS, not milliseconds
-      // startTime and endTime from contract are in seconds, so we need to convert for display
-      const currentTimeSec = Math.floor(Date.now() / 1000);
-      const isActive = status === 0 && currentTimeSec >= startTime && currentTimeSec < endTime;
-      
+      // Determine if poll is active based on contract status and time
+      // NOTE: Context.timestamp() in Massa returns MILLISECONDS, not seconds (despite what comments say)
+      // Contract status: 0=ACTIVE, 1=CLOSED (manually closed), 2=ENDED (time expired)
+      const currentTimeMs = Date.now();
+      const isActive = contractStatus === 0 && currentTimeMs >= startTime && currentTimeMs < endTime;
+
+      // Determine display status
+      let displayStatus: 'active' | 'closed' | 'ended' = 'active';
+      if (contractStatus === 1) {
+        displayStatus = 'closed';
+      } else if (contractStatus === 2 || currentTimeMs >= endTime) {
+        displayStatus = 'ended';
+      } else if (contractStatus === 0 && currentTimeMs >= startTime && currentTimeMs < endTime) {
+        displayStatus = 'active';
+      }
+
       console.log(`⏰ Timestamp Analysis:`);
-      console.log(`   Current Time (sec): ${currentTimeSec}`);
-      console.log(`   Start Time (sec): ${startTime}`);
-      console.log(`   End Time (sec): ${endTime}`);
-      console.log(`   Status: ${status}`);
-      console.log(`   Time comparison: ${currentTimeSec} >= ${startTime} && ${currentTimeSec} < ${endTime} = ${currentTimeSec >= startTime && currentTimeSec < endTime}`);
+      console.log(`   Current Time (ms): ${currentTimeMs} (${new Date(currentTimeMs).toLocaleString()})`);
+      console.log(`   Start Time (ms): ${startTime} (${new Date(startTime).toLocaleString()})`);
+      console.log(`   End Time (ms): ${endTime} (${new Date(endTime).toLocaleString()})`);
+      console.log(`   Contract Status: ${contractStatus} (0=ACTIVE, 1=CLOSED, 2=ENDED)`);
+      console.log(`   Time until end: ${((endTime - currentTimeMs) / 1000).toFixed(0)} seconds (${((endTime - currentTimeMs) / 3600000).toFixed(2)} hours)`);
+      console.log(`   Time comparison: ${currentTimeMs} >= ${startTime} && ${currentTimeMs} < ${endTime} = ${currentTimeMs >= startTime && currentTimeMs < endTime}`);
 
       console.log(`📊 Successfully parsed poll:`);
       console.log(`   ID: ${id}`);
@@ -463,11 +497,15 @@ export class PollsContract {
       console.log(`   Description: "${description}"`);
       console.log(`   Options: [${options.map(opt => `"${opt}"`).join(', ')}]`);
       console.log(`   Creator: ${creator}`);
-      console.log(`   Start Time: ${new Date(startTime * 1000).toLocaleString()} (${startTime} sec)`);
-      console.log(`   End Time: ${new Date(endTime * 1000).toLocaleString()} (${endTime} sec)`);
-      console.log(`   Current Time: ${new Date(currentTimeSec * 1000).toLocaleString()} (${currentTimeSec} sec)`);
+      console.log(`   Start Time: ${new Date(startTime).toLocaleString()} (${startTime} ms)`);
+      console.log(`   End Time: ${new Date(endTime).toLocaleString()} (${endTime} ms)`);
+      console.log(`   Current Time: ${new Date(currentTimeMs).toLocaleString()} (${currentTimeMs} ms)`);
       console.log(`   Final Active Status: ${isActive ? 'Active' : 'Inactive'}`);
+      console.log(`   Display Status: ${displayStatus}`);
       console.log(`   Votes: [${votes.join(', ')}]`);
+      console.log(`   Reward Pool: ${rewardPool} nanoMASSA`);
+      console.log(`   Funding Type: ${fundingType}`);
+      console.log(`   Distribution Mode: ${distributionMode}`);
 
       return {
         id,
@@ -477,17 +515,18 @@ export class PollsContract {
         creator,
         votes,
         isActive,
-        createdAt: startTime * 1000, // Convert to milliseconds for JavaScript Date
-        endTime: endTime * 1000, // Convert to milliseconds for JavaScript Date
-        status: isActive ? 'active' as const : 'ended' as const,
-        rewardPool: 0,
-        fundingType: 0,
-        distributionMode: 0,
-        distributionType: 0,
-        fixedRewardAmount: 0,
-        fundingGoal: 0,
-        treasuryApproved: false,
-        rewardsDistributed: false
+        createdAt: startTime, // Already in milliseconds from contract
+        endTime: endTime, // Already in milliseconds from contract
+        status: displayStatus,
+        projectId,
+        rewardPool,
+        fundingType,
+        distributionMode,
+        distributionType,
+        fixedRewardAmount,
+        fundingGoal,
+        treasuryApproved,
+        rewardsDistributed
       };
     } catch (error) {
       console.error('💥 Error parsing poll data:', error);

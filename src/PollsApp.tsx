@@ -761,6 +761,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                         <th className="th-votes">VOTES</th>
                         <th className="th-rewards">REWARDS</th>
                         <th className="th-creator">CREATOR</th>
+                        <th className="th-time">END DATE</th>
                         <th className="th-time">TIME REMAINING</th>
                       </tr>
                     </thead>
@@ -791,8 +792,10 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                             </div>
                           </td>
                           <td className="td-status">
-                            <span className={`status-badge ${poll.isActive ? 'active' : 'inactive'}`}>
-                              {poll.isActive ? 'Active' : 'Ended'}
+                            <span className={`status-badge ${poll.status}`}>
+                              {poll.status === 'active' && '🟢 Active'}
+                              {poll.status === 'closed' && '🔴 Closed'}
+                              {poll.status === 'ended' && '⏸️ Ended'}
                             </span>
                           </td>
                           <td className="td-votes">
@@ -804,6 +807,11 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                           <td className="td-creator">
                             <span className="creator-address">
                               {poll.creator.slice(0, 6)}...{poll.creator.slice(-4)}
+                            </span>
+                          </td>
+                          <td className="td-time">
+                            <span className="end-date">
+                              {new Date(poll.endTime).toLocaleDateString()} {new Date(poll.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </td>
                           <td className="td-time">

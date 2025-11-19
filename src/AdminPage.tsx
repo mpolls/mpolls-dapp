@@ -618,8 +618,10 @@ const AdminPage = ({ onBack }: AdminPageProps) => {
                             <div className="poll-description">{poll.description.slice(0, 50)}...</div>
                           </div>
                           <div className="col-status">
-                            <span className={`status-badge ${poll.isActive ? 'active' : 'ended'}`}>
-                              {poll.isActive ? '🟢 Active' : '🔴 Ended'}
+                            <span className={`status-badge ${poll.status}`}>
+                              {poll.status === 'active' && '🟢 Active'}
+                              {poll.status === 'closed' && '🔴 Closed'}
+                              {poll.status === 'ended' && '⏸️ Ended'}
                             </span>
                           </div>
                           <div className="col-votes">{poll.totalVotes}</div>
