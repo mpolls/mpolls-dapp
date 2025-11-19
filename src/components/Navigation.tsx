@@ -240,7 +240,7 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, currentPage, onScro
         <nav className="bottom-nav">
         <div className="bottom-nav-container">
           <button
-            className={`bottom-nav-item ${currentPage === 'home' ? 'active' : ''}`}
+            className="bottom-nav-item"
             onClick={() => onNavigate('home')}
           >
             <div className="bottom-nav-icon">

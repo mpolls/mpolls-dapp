@@ -1780,6 +1780,125 @@ export class PollsContract {
       return { fundingType: 'unknown', status: 'unknown' };
     }
   }
+
+  // ================= TOKEN FUNCTIONS =================
+
+  /**
+   * Buy MPOLLS tokens by sending MASSA
+   * @param massaAmount - Amount of MASSA to spend
+   */
+  async buyTokens(massaAmount: number): Promise<void> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log(`💰 Buying MPOLLS tokens with ${massaAmount} MASSA`);
+
+      // Get token contract address from environment
+      const tokenContractAddress = import.meta.env.VITE_TOKEN_CONTRACT_ADDRESS;
+      if (!tokenContractAddress) {
+        throw new Error("Token contract address not configured");
+      }
+
+      // Convert MASSA to nanoMASSA
+      const massaInNano = BigInt(Math.floor(massaAmount * 1e9));
+
+      // Call buyTokens function on token contract
+      const result = await this.account.callSC({
+        target: tokenContractAddress,
+        func: "buyTokens",
+        parameter: new Args().serialize(), // No parameters needed
+        coins: massaInNano, // Send MASSA with transaction
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Token purchase successful!");
+      console.log("📋 Transaction result:", result);
+
+      // Wait for transaction to be processed
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+    } catch (error) {
+      console.error("Failed to buy tokens:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get caller's MPOLLS token balance
+   */
+  async getMyTokenBalance(): Promise<number> {
+    try {
+      const tokenContractAddress = import.meta.env.VITE_TOKEN_CONTRACT_ADDRESS;
+      if (!tokenContractAddress) {
+        throw new Error("Token contract address not configured");
+      }
+
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      // Call myBalance function on token contract
+      const events = await provider.getEvents({
+        smartContractAddress: tokenContractAddress,
+      });
+
+      // Look for balance events - in a real implementation, we'd call the contract
+      // For now, return 0 as placeholder
+      // TODO: Implement proper balance reading from contract storage
+      console.log("Note: Token balance reading not yet fully implemented");
+      return 0;
+
+    } catch (error) {
+      console.error("Error getting token balance:", error);
+      return 0;
+    }
+  }
+
+  /**
+   * Approve polls contract to spend MPOLLS tokens
+   * @param amount - Amount of tokens to approve
+   */
+  async approveTokenSpending(amount: number): Promise<void> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log(`✅ Approving polls contract to spend ${amount} MPOLLS tokens`);
+
+      const tokenContractAddress = import.meta.env.VITE_TOKEN_CONTRACT_ADDRESS;
+      if (!tokenContractAddress) {
+        throw new Error("Token contract address not configured");
+      }
+
+      // Convert amount to smallest unit
+      const amountInSmallestUnit = BigInt(Math.floor(amount * 1e9));
+
+      // Call approve function on token contract
+      const args = new Args()
+        .addString(this.contractAddress) // spender (polls contract)
+        .addU64(amountInSmallestUnit); // amount
+
+      const result = await this.account.callSC({
+        target: tokenContractAddress,
+        func: "approve",
+        parameter: args.serialize(),
+        coins: BigInt(0),
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Token approval successful!");
+      console.log("📋 Transaction result:", result);
+
+      // Wait for transaction to be processed
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+    } catch (error) {
+      console.error("Failed to approve token spending:", error);
+      throw error;
+    }
+  }
 }
 
 // Create a singleton instance

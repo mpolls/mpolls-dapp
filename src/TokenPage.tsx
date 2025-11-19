@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TokenContract, TokenInfo } from './utils/tokenContract';
 import { useToast } from './components/ToastContainer';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import SendIcon from '@mui/icons-material/Send';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
@@ -15,13 +14,12 @@ const tokenContract = tokenContractAddress ? new TokenContract(tokenContractAddr
 
 interface TokenPageProps {
   onBack: () => void;
+  isWalletConnected?: boolean;
+  walletAddress?: string | null;
 }
 
-const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
+const TokenPage: React.FC<TokenPageProps> = ({ onBack, isWalletConnected = false, walletAddress = null }) => {
   const toast = useToast();
-  const [isConnected, setIsConnected] = useState(false);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [walletName, setWalletName] = useState<string | null>(null);
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
   const [balance, setBalance] = useState<string>('0');
   const [isMinter, setIsMinter] = useState(false);
@@ -34,70 +32,28 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
   const [transferAmount, setTransferAmount] = useState('');
   const [burnAmount, setBurnAmount] = useState('');
   const [grantMinterAddress, setGrantMinterAddress] = useState('');
+  const [buyMassaAmount, setBuyMassaAmount] = useState('1');
+
+  // Exchange rate constant
+  const EXCHANGE_RATE = 100; // 1 MASSA = 100 MPOLLS
 
   useEffect(() => {
-    checkWalletConnection();
     if (tokenContract) {
       fetchTokenInfo();
     }
   }, []);
 
   useEffect(() => {
-    if (isConnected && walletAddress) {
-      refreshBalance();
-      checkMinterStatus();
-    }
-  }, [isConnected, walletAddress]);
-
-  const checkWalletConnection = async () => {
-    if (!tokenContract) {
-      toast.error('Token contract address not configured');
-      return;
-    }
-
-    try {
-      const connected = await tokenContract.isWalletConnected();
-      setIsConnected(connected);
-
-      if (connected) {
-        const address = await tokenContract.getWalletAddress();
-        const name = tokenContract.getWalletName();
-        setWalletAddress(address);
-        setWalletName(name);
+    const syncWallet = async () => {
+      if (isWalletConnected && walletAddress && tokenContract) {
+        // Sync wallet connection from the global wallet state
+        await tokenContract.syncWalletConnection();
+        refreshBalance();
+        checkMinterStatus();
       }
-    } catch (error) {
-      console.error('Error checking wallet connection:', error);
-    }
-  };
-
-  const connectWallet = async () => {
-    if (!tokenContract) {
-      toast.error('Token contract address not configured');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const connected = await tokenContract.connectWallet();
-      if (connected) {
-        setIsConnected(true);
-        const address = await tokenContract.getWalletAddress();
-        const name = tokenContract.getWalletName();
-        setWalletAddress(address);
-        setWalletName(name);
-        toast.success('Wallet connected successfully!');
-        await refreshBalance();
-        await checkMinterStatus();
-      } else {
-        toast.error('Failed to connect wallet');
-      }
-    } catch (error) {
-      console.error('Error connecting wallet:', error);
-      toast.error('Error connecting wallet');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+    syncWallet();
+  }, [isWalletConnected, walletAddress]);
 
   const fetchTokenInfo = async () => {
     if (!tokenContract) return;
@@ -111,7 +67,7 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
   };
 
   const refreshBalance = async () => {
-    if (!tokenContract || !isConnected) return;
+    if (!tokenContract || !isWalletConnected) return;
 
     try {
       const bal = await tokenContract.getMyBalance();
@@ -160,6 +116,34 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
     } catch (error) {
       console.error('Error minting tokens:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to mint tokens');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBuyTokens = async () => {
+    if (!tokenContract) {
+      toast.error('Token contract not initialized');
+      return;
+    }
+
+    const massaAmount = parseFloat(buyMassaAmount);
+    if (!massaAmount || massaAmount <= 0) {
+      toast.error('Please enter a valid MASSA amount');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await tokenContract.buyTokens(massaAmount);
+      const tokensReceived = massaAmount * EXCHANGE_RATE;
+      toast.success(`Successfully purchased ${tokensReceived} MPOLLS tokens for ${massaAmount} MASSA!`);
+      setBuyMassaAmount('1'); // Reset to default
+      await refreshBalance();
+      await fetchTokenInfo();
+    } catch (error) {
+      console.error('Error buying tokens:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to buy tokens');
     } finally {
       setLoading(false);
     }
@@ -284,53 +268,13 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
         <div className="token-header">
           <h1>🪙 MPOLLS Token Manager</h1>
           <p className="token-subtitle">Mint and manage MPOLLS reward tokens</p>
-        </div>
-
-        {/* Wallet Connection */}
-        <div className="wallet-section card">
-          <h2>
-            <AccountBalanceWalletIcon /> Wallet Connection
-          </h2>
-          {!isConnected ? (
-            <button
-              className="connect-wallet-btn"
-              onClick={connectWallet}
-              disabled={loading}
-            >
-              {loading ? 'Connecting...' : 'Connect Wallet'}
-            </button>
-          ) : (
-            <div className="wallet-info">
-              <div className="info-row">
-                <span className="label">Wallet:</span>
-                <span className="value">{walletName}</span>
-              </div>
-              <div className="info-row">
-                <span className="label">Address:</span>
-                <span className="value address-value">
-                  {walletAddress}
-                  {walletAddress && (
-                    <button
-                      className="copy-btn"
-                      onClick={() => copyToClipboard(walletAddress)}
-                      title="Copy address"
-                    >
-                      <ContentCopyIcon sx={{ fontSize: 16 }} />
-                    </button>
-                  )}
-                </span>
-              </div>
-              {isMinter && (
-                <div className="minter-badge">
-                  ✓ Minter Role
-                </div>
-              )}
-            </div>
+          {!isWalletConnected && (
+            <p className="wallet-connect-hint">Please connect your wallet using the header button to manage tokens</p>
           )}
         </div>
 
         {/* Token Info */}
-        {isConnected && tokenInfo && (
+        {isWalletConnected && tokenInfo && (
           <div className="token-info-section card">
             <div className="section-header">
               <h2>Token Information</h2>
@@ -366,8 +310,51 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
           </div>
         )}
 
+        {/* Buy Tokens Section */}
+        {isWalletConnected && (
+          <div className="action-section card buy-tokens-section">
+            <h2>
+              💰 Buy MPOLLS Tokens
+            </h2>
+            <p className="section-description">Purchase MPOLLS tokens with MASSA to fund poll rewards</p>
+
+            <div className="exchange-rate-banner">
+              <strong>Exchange Rate:</strong> 1 MASSA = {EXCHANGE_RATE} MPOLLS
+            </div>
+
+            <div className="form-group">
+              <label>MASSA Amount</label>
+              <input
+                type="number"
+                placeholder="Enter MASSA amount"
+                value={buyMassaAmount}
+                onChange={(e) => setBuyMassaAmount(e.target.value)}
+                disabled={loading}
+                min="0.001"
+                step="0.001"
+              />
+              <small>Minimum: 0.001 MASSA</small>
+            </div>
+
+            <div className="conversion-preview">
+              <div className="preview-label">You will receive:</div>
+              <div className="preview-amount">
+                {(parseFloat(buyMassaAmount) * EXCHANGE_RATE).toLocaleString()} MPOLLS
+              </div>
+            </div>
+
+            <button
+              className="action-button buy-button"
+              onClick={handleBuyTokens}
+              disabled={loading || !buyMassaAmount || parseFloat(buyMassaAmount) <= 0}
+            >
+              {loading ? 'Processing...' : `Buy ${(parseFloat(buyMassaAmount) * EXCHANGE_RATE).toLocaleString()} MPOLLS`}
+            </button>
+          </div>
+        )}
+
         {/* Mint Section */}
-        {isConnected && isMinter && (
+        {isWalletConnected && isMinter && (
           <div className="action-section card">
             <h2>
               <AddCircleIcon /> Mint Tokens
@@ -406,7 +393,7 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
         )}
 
         {/* Transfer Section */}
-        {isConnected && (
+        {isWalletConnected && (
           <div className="action-section card">
             <h2>
               <SendIcon /> Transfer Tokens
@@ -445,7 +432,7 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
         )}
 
         {/* Burn Section */}
-        {isConnected && (
+        {isWalletConnected && (
           <div className="action-section card">
             <h2>
               <LocalFireDepartmentIcon /> Burn Tokens
@@ -474,7 +461,7 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
         )}
 
         {/* Grant Minter Role (Owner only) */}
-        {isConnected && (
+        {isWalletConnected && (
           <div className="action-section card">
             <h2>👑 Grant Minter Role</h2>
             <p className="section-description">Grant minting permission to an address (Owner only)</p>

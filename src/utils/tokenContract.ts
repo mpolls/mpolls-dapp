@@ -8,6 +8,15 @@ import {
 } from "@massalabs/wallet-provider";
 import { Provider } from "@massalabs/massa-web3";
 
+// Simple utility functions for byte conversion
+function stringToBytes(str: string): Uint8Array {
+  return new TextEncoder().encode(str);
+}
+
+function bytesToString(bytes: Uint8Array): string {
+  return new TextDecoder().decode(bytes);
+}
+
 export interface TokenInfo {
   name: string;
   symbol: string;
@@ -46,6 +55,36 @@ export class TokenContract {
       console.error("Failed to connect wallet:", error);
       this.wallet = null;
       this.account = null;
+      return false;
+    }
+  }
+
+  /**
+   * Sync wallet connection from another contract instance (e.g., pollsContract)
+   * This allows sharing wallet connection across different contract instances
+   */
+  async syncWalletConnection(): Promise<boolean> {
+    try {
+      const wallets = await getWallets();
+      if (wallets.length === 0) {
+        return false;
+      }
+
+      this.wallet = wallets[0];
+      const connected = await this.wallet.connected();
+
+      if (connected) {
+        const accounts = await this.wallet.accounts();
+        if (accounts.length === 0) {
+          return false;
+        }
+        this.account = accounts[0];
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error("Failed to sync wallet connection:", error);
       return false;
     }
   }
@@ -95,47 +134,33 @@ export class TokenContract {
       const { JsonRpcProvider } = await import("@massalabs/massa-web3");
       const provider = JsonRpcProvider.buildnet();
 
-      // Call all info functions
-      await Promise.all([
-        provider.readSC({
-          target: this.contractAddress,
-          func: "name",
-          parameter: new Args().serialize(),
-        }),
-        provider.readSC({
-          target: this.contractAddress,
-          func: "symbol",
-          parameter: new Args().serialize(),
-        }),
-        provider.readSC({
-          target: this.contractAddress,
-          func: "decimals",
-          parameter: new Args().serialize(),
-        }),
-        provider.readSC({
-          target: this.contractAddress,
-          func: "totalSupply",
-          parameter: new Args().serialize(),
-        }),
-      ]);
-
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
+      // Get events to calculate total supply from buy/mint events
       const events = await provider.getEvents({
         smartContractAddress: this.contractAddress,
       });
 
-      const nameEvent = events.find(e => e.data.includes("Token name:"));
-      const symbolEvent = events.find(e => e.data.includes("Token symbol:"));
-      const decimalsEvent = events.find(e => e.data.includes("Token decimals:"));
-      const supplyEvent = events.find(e => e.data.includes("Total supply:"));
+      // Calculate total supply from events
+      // Start with initial supply
+      let totalSupply = BigInt("1000000000000000000"); // 1 billion with 9 decimals
 
-      const name = nameEvent ? nameEvent.data.replace("Token name:", "").trim() : "MPOLLS";
-      const symbol = symbolEvent ? symbolEvent.data.replace("Token symbol:", "").trim() : "MPOLLS";
-      const decimals = decimalsEvent ? parseInt(decimalsEvent.data.replace("Token decimals:", "").trim()) : 9;
-      const totalSupply = supplyEvent ? supplyEvent.data.replace("Total supply:", "").trim() : "0";
+      // Add tokens from buy events
+      events.forEach(event => {
+        // Match "bought XXX MPOLLS tokens" events
+        const buyMatch = event.data.match(/bought (\d+) MPOLLS tokens/);
+        if (buyMatch) {
+          totalSupply += BigInt(buyMatch[1]) * BigInt(1000000000); // Convert to smallest unit
+        }
+      });
 
-      return { name, symbol, decimals, totalSupply };
+      console.log(`📊 Total supply calculated: ${totalSupply.toString()}`);
+
+      // Return hardcoded token metadata (these are constants in the contract)
+      return {
+        name: "MPolls Token",
+        symbol: "MPOLLS",
+        decimals: 9,
+        totalSupply: totalSupply.toString()
+      };
     } catch (error) {
       console.error("Error fetching token info:", error);
       return null;
@@ -161,7 +186,9 @@ export class TokenContract {
         smartContractAddress: this.contractAddress,
       });
 
-      const balanceEvent = events.find(e => e.data.includes(`Balance of ${address}:`));
+      // Get most recent event (reverse to get newest first)
+      const recentEvents = [...events].reverse();
+      const balanceEvent = recentEvents.find(e => e.data.includes(`Balance of ${address}:`));
       if (balanceEvent) {
         const match = balanceEvent.data.match(/Balance of .+: (\d+)/);
         if (match) {
@@ -178,30 +205,74 @@ export class TokenContract {
 
   async getMyBalance(): Promise<string> {
     try {
+      if (!this.wallet || !this.account) {
+        console.log("⚠️ No wallet connected, cannot fetch balance");
+        return "0";
+      }
+
       const { JsonRpcProvider } = await import("@massalabs/massa-web3");
       const provider = JsonRpcProvider.buildnet();
 
-      await provider.readSC({
-        target: this.contractAddress,
-        func: "myBalance",
-        parameter: new Args().serialize(),
-      });
+      // Get the wallet address
+      const accounts = await this.wallet.accounts();
+      if (accounts.length === 0) {
+        return "0";
+      }
+      const accountProvider = accounts[0];
+      const address = (accountProvider as any).address || "";
 
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (!address) {
+        return "0";
+      }
 
+      // Calculate balance from events
       const events = await provider.getEvents({
         smartContractAddress: this.contractAddress,
       });
 
-      const balanceEvent = events.find(e => e.data.includes("Your balance:"));
-      if (balanceEvent) {
-        const match = balanceEvent.data.match(/Your balance: (\d+)/);
-        if (match) {
-          return match[1];
-        }
+      let balance = BigInt(0);
+
+      // Check if this address is the deployer (gets initial supply)
+      const deployEvent = events.find(e => e.data.includes("Initial supply allocated to:") && e.data.includes(address));
+      if (deployEvent) {
+        balance = BigInt("1000000000000000000"); // 1 billion tokens
+        console.log(`📊 Address is deployer, initial balance: ${balance.toString()}`);
       }
 
-      return "0";
+      // Add tokens from buy events for this address
+      events.forEach(event => {
+        if (event.data.includes(address) && event.data.includes("bought")) {
+          const buyMatch = event.data.match(/bought (\d+) MPOLLS tokens/);
+          if (buyMatch) {
+            const tokensReceived = BigInt(buyMatch[1]) * BigInt(1000000000); // Convert to smallest unit
+            balance += tokensReceived;
+            console.log(`📊 Found buy event: +${tokensReceived.toString()}`);
+          }
+        }
+      });
+
+      // Subtract tokens from transfer events (sent by this address)
+      events.forEach(event => {
+        if (event.data.startsWith(`Transfer: ${address} ->`)) {
+          const transferMatch = event.data.match(/amount: (\d+)/);
+          if (transferMatch) {
+            balance -= BigInt(transferMatch[1]);
+          }
+        }
+      });
+
+      // Add tokens from transfer events (received by this address)
+      events.forEach(event => {
+        if (event.data.includes(`-> ${address},`)) {
+          const transferMatch = event.data.match(/amount: (\d+)/);
+          if (transferMatch) {
+            balance += BigInt(transferMatch[1]);
+          }
+        }
+      });
+
+      console.log(`📊 Final balance for ${address}: ${balance.toString()}`);
+      return balance.toString();
     } catch (error) {
       console.error("Error fetching my balance:", error);
       return "0";
@@ -329,7 +400,9 @@ export class TokenContract {
         smartContractAddress: this.contractAddress,
       });
 
-      const minterEvent = events.find(e => e.data.includes(`Address ${address} is minter:`));
+      // Get most recent event (reverse to get newest first)
+      const recentEvents = [...events].reverse();
+      const minterEvent = recentEvents.find(e => e.data.includes(`Address ${address} is minter:`));
       if (minterEvent) {
         return minterEvent.data.includes("true");
       }
@@ -416,6 +489,56 @@ export class TokenContract {
     const [whole, fraction = '0'] = amount.split('.');
     const paddedFraction = fraction.padEnd(decimals, '0').slice(0, decimals);
     return (BigInt(whole) * BigInt(10 ** decimals) + BigInt(paddedFraction)).toString();
+  }
+
+  /**
+   * Buy MPOLLS tokens by sending MASSA
+   * @param massaAmount - Amount of MASSA to spend
+   */
+  async buyTokens(massaAmount: number): Promise<void> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log(`💰 Buying MPOLLS tokens with ${massaAmount} MASSA`);
+
+      // Convert MASSA to nanoMASSA
+      const massaInNano = BigInt(Math.floor(massaAmount * 1e9));
+
+      // Call buyTokens function on token contract
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "buyTokens",
+        parameter: new Args().serialize(), // No parameters needed
+        coins: massaInNano, // Send MASSA with transaction
+        fee: Mas.fromString('0.01'),
+        maxGas: BigInt(2000000000), // Set high max gas to avoid estimation issues
+      });
+
+      console.log("✅ Token purchase successful!");
+      console.log("📋 Transaction result:", result);
+
+      // Wait longer for transaction to be fully processed and events to be indexed
+      await new Promise(resolve => setTimeout(resolve, 6000));
+
+      // Verify the purchase by checking recent events
+      try {
+        const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+        const verifyProvider = JsonRpcProvider.buildnet();
+        const events = await verifyProvider.getEvents({
+          smartContractAddress: this.contractAddress,
+        });
+        const recentEvents = events.slice(-5);
+        console.log("📋 Recent events after purchase:", recentEvents.map(e => e.data));
+      } catch (e) {
+        console.log("Could not verify events:", e);
+      }
+
+    } catch (error) {
+      console.error("Failed to buy tokens:", error);
+      throw error;
+    }
   }
 }
 
