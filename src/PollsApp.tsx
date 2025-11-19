@@ -40,7 +40,7 @@ interface Poll extends Omit<ContractPoll, 'id' | 'votes'> {
   rewardsDistributed: boolean;
 }
 
-type PageType = 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token';
+type PageType = 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap';
 
 interface PollsAppProps {
   initialView?: PageType;

@@ -134,9 +134,9 @@ export class SwapContract {
 
     const args = new Args();
 
-    await this.account.callSmartContract({
-      targetAddress: this.contractAddress,
-      targetFunction: "swapMassaForMpolls",
+    await this.account.callSC({
+      target: this.contractAddress,
+      func: "swapMassaForMpolls",
       parameter: args.serialize(),
       coins: massaNano,
       fee: Mas.fromString("0.01"),
@@ -157,9 +157,9 @@ export class SwapContract {
 
     const args = new Args().addU64(mpollsNano);
 
-    await this.account.callSmartContract({
-      targetAddress: this.contractAddress,
-      targetFunction: "swapMpollsForMassa",
+    await this.account.callSC({
+      target: this.contractAddress,
+      func: "swapMpollsForMassa",
       parameter: args.serialize(),
       fee: Mas.fromString("0.01"),
       maxGas: BigInt(2000000000)
