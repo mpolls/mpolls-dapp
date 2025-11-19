@@ -11,6 +11,15 @@ interface Poll extends Omit<ContractPoll, 'id' | 'votes'> {
   totalVotes: number;
   timeLeft: string;
   rewards: string;
+  // Include economics fields from ContractPoll
+  rewardPool: number;
+  fundingType: number;
+  distributionMode: number;
+  distributionType: number;
+  fixedRewardAmount: number;
+  fundingGoal: number;
+  treasuryApproved: boolean;
+  rewardsDistributed: boolean;
 }
 
 const CONTRACT_CREATOR_ADDRESS = "AU1Pd3bod1Js2xD71GLFd1Q1dA8tnugsHroL54Rn7SzYY5KiozfS";
@@ -65,7 +74,7 @@ const AdminPage = ({ onBack }: AdminPageProps) => {
       
       const displayPolls: Poll[] = contractPolls.map(contractPoll => {
         const totalVotes = contractPoll.votes.reduce((sum, votes) => sum + votes, 0);
-        
+
         return {
           id: parseInt(contractPoll.id),
           title: contractPoll.title,
@@ -79,7 +88,15 @@ const AdminPage = ({ onBack }: AdminPageProps) => {
           isActive: contractPoll.isActive,
           createdAt: contractPoll.createdAt,
           endTime: contractPoll.endTime,
-          status: contractPoll.status
+          status: contractPoll.status,
+          rewardPool: contractPoll.rewardPool || 0,
+          fundingType: contractPoll.fundingType || 0,
+          distributionMode: contractPoll.distributionMode || 0,
+          distributionType: contractPoll.distributionType || 0,
+          fixedRewardAmount: contractPoll.fixedRewardAmount || 0,
+          fundingGoal: contractPoll.fundingGoal || 0,
+          treasuryApproved: contractPoll.treasuryApproved || false,
+          rewardsDistributed: contractPoll.rewardsDistributed || false
         };
       });
       

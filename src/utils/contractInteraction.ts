@@ -185,9 +185,9 @@ export class PollsContract {
       }
 
       // Add new economics parameters
-      args.addU8(params.fundingType);
-      args.addU8(params.distributionMode);
-      args.addU8(params.distributionType);
+      args.addU8(BigInt(params.fundingType));
+      args.addU8(BigInt(params.distributionMode));
+      args.addU8(BigInt(params.distributionType));
 
       // Convert MASSA to nanoMASSA (1 MASSA = 10^9 nanoMASSA)
       const fixedRewardInNano = BigInt(Math.floor(params.fixedRewardAmount * 1e9));
@@ -376,7 +376,15 @@ export class PollsContract {
         isActive: true,
         createdAt: Date.now(),
         endTime: Date.now() + (7 * 24 * 60 * 60 * 1000), // Default 7 days from now
-        status: 'active' as const
+        status: 'active' as const,
+        rewardPool: 0,
+        fundingType: 0,
+        distributionMode: 0,
+        distributionType: 0,
+        fixedRewardAmount: 0,
+        fundingGoal: 0,
+        treasuryApproved: false,
+        rewardsDistributed: false
       };
     } catch (error) {
       console.error("Error fetching poll:", error);
@@ -471,7 +479,15 @@ export class PollsContract {
         isActive,
         createdAt: startTime * 1000, // Convert to milliseconds for JavaScript Date
         endTime: endTime * 1000, // Convert to milliseconds for JavaScript Date
-        status: isActive ? 'active' as const : 'ended' as const
+        status: isActive ? 'active' as const : 'ended' as const,
+        rewardPool: 0,
+        fundingType: 0,
+        distributionMode: 0,
+        distributionType: 0,
+        fixedRewardAmount: 0,
+        fundingGoal: 0,
+        treasuryApproved: false,
+        rewardsDistributed: false
       };
     } catch (error) {
       console.error('💥 Error parsing poll data:', error);
@@ -1487,32 +1503,6 @@ export class PollsContract {
     }
   }
 
-  async updateProject(projectId: string, newName: string, newDescription: string): Promise<boolean> {
-    if (!this.account) {
-      throw new Error("Wallet not connected. Please connect your wallet first.");
-    }
-
-    try {
-      const args = new Args()
-        .addString(projectId)
-        .addString(newName)
-        .addString(newDescription);
-
-      const result = await this.account.callSC({
-        target: this.contractAddress,
-        func: "updateProject",
-        parameter: args.serialize(),
-        coins: 0n,
-        fee: Mas.fromString('0.01'),
-      });
-
-      console.log("✅ Project update transaction result:", result);
-      return true;
-    } catch (error) {
-      console.error("Error updating project:", error);
-      throw new Error(`Failed to update project: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
 
   async deleteProject(projectId: string): Promise<boolean> {
     if (!this.account) {
@@ -1660,8 +1650,6 @@ export class PollsContract {
 
       const events = await provider.getEvents({
         smartContractAddress: this.contractAddress,
-        start: null,
-        end: null,
       });
 
       const pendingEvents = events.filter(event =>
@@ -1698,8 +1686,6 @@ export class PollsContract {
 
       const events = await provider.getEvents({
         smartContractAddress: this.contractAddress,
-        start: null,
-        end: null,
       });
 
       const statusEvents = events.filter(event =>

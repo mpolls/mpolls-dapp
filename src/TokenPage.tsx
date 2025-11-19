@@ -18,7 +18,7 @@ interface TokenPageProps {
 }
 
 const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
-  const { addToast } = useToast();
+  const toast = useToast();
   const [isConnected, setIsConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [walletName, setWalletName] = useState<string | null>(null);
@@ -51,7 +51,7 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
 
   const checkWalletConnection = async () => {
     if (!tokenContract) {
-      addToast('Token contract address not configured', 'error');
+      toast.error('Token contract address not configured');
       return;
     }
 
@@ -72,7 +72,7 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
 
   const connectWallet = async () => {
     if (!tokenContract) {
-      addToast('Token contract address not configured', 'error');
+      toast.error('Token contract address not configured');
       return;
     }
 
@@ -85,15 +85,15 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
         const name = tokenContract.getWalletName();
         setWalletAddress(address);
         setWalletName(name);
-        addToast('Wallet connected successfully!', 'success');
+        toast.success('Wallet connected successfully!');
         await refreshBalance();
         await checkMinterStatus();
       } else {
-        addToast('Failed to connect wallet', 'error');
+        toast.error('Failed to connect wallet');
       }
     } catch (error) {
       console.error('Error connecting wallet:', error);
-      addToast('Error connecting wallet', 'error');
+      toast.error('Error connecting wallet');
     } finally {
       setLoading(false);
     }
@@ -134,17 +134,17 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
 
   const handleMint = async () => {
     if (!tokenContract) {
-      addToast('Token contract not initialized', 'error');
+      toast.error('Token contract not initialized');
       return;
     }
 
     if (!mintTo || !mintAmount) {
-      addToast('Please fill in all fields', 'error');
+      toast.error('Please fill in all fields');
       return;
     }
 
     if (!isMinter) {
-      addToast('You do not have minter role', 'error');
+      toast.error('You do not have minter role');
       return;
     }
 
@@ -152,14 +152,14 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
     try {
       const amountInSmallestUnit = tokenContract.parseTokenAmount(mintAmount, tokenInfo?.decimals || 9);
       await tokenContract.mint(mintTo, amountInSmallestUnit);
-      addToast(`Successfully minted ${mintAmount} MPOLLS tokens!`, 'success');
+      toast.success(`Successfully minted ${mintAmount} MPOLLS tokens!`);
       setMintTo('');
       setMintAmount('');
       await refreshBalance();
       await fetchTokenInfo();
     } catch (error) {
       console.error('Error minting tokens:', error);
-      addToast(error instanceof Error ? error.message : 'Failed to mint tokens', 'error');
+      toast.error(error instanceof Error ? error.message : 'Failed to mint tokens');
     } finally {
       setLoading(false);
     }
@@ -167,12 +167,12 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
 
   const handleTransfer = async () => {
     if (!tokenContract) {
-      addToast('Token contract not initialized', 'error');
+      toast.error('Token contract not initialized');
       return;
     }
 
     if (!transferTo || !transferAmount) {
-      addToast('Please fill in all fields', 'error');
+      toast.error('Please fill in all fields');
       return;
     }
 
@@ -180,13 +180,13 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
     try {
       const amountInSmallestUnit = tokenContract.parseTokenAmount(transferAmount, tokenInfo?.decimals || 9);
       await tokenContract.transfer(transferTo, amountInSmallestUnit);
-      addToast(`Successfully transferred ${transferAmount} MPOLLS tokens!`, 'success');
+      toast.success(`Successfully transferred ${transferAmount} MPOLLS tokens!`);
       setTransferTo('');
       setTransferAmount('');
       await refreshBalance();
     } catch (error) {
       console.error('Error transferring tokens:', error);
-      addToast(error instanceof Error ? error.message : 'Failed to transfer tokens', 'error');
+      toast.error(error instanceof Error ? error.message : 'Failed to transfer tokens');
     } finally {
       setLoading(false);
     }
@@ -194,12 +194,12 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
 
   const handleBurn = async () => {
     if (!tokenContract) {
-      addToast('Token contract not initialized', 'error');
+      toast.error('Token contract not initialized');
       return;
     }
 
     if (!burnAmount) {
-      addToast('Please enter an amount to burn', 'error');
+      toast.error('Please enter an amount to burn');
       return;
     }
 
@@ -207,13 +207,13 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
     try {
       const amountInSmallestUnit = tokenContract.parseTokenAmount(burnAmount, tokenInfo?.decimals || 9);
       await tokenContract.burn(amountInSmallestUnit);
-      addToast(`Successfully burned ${burnAmount} MPOLLS tokens!`, 'success');
+      toast.success(`Successfully burned ${burnAmount} MPOLLS tokens!`);
       setBurnAmount('');
       await refreshBalance();
       await fetchTokenInfo();
     } catch (error) {
       console.error('Error burning tokens:', error);
-      addToast(error instanceof Error ? error.message : 'Failed to burn tokens', 'error');
+      toast.error(error instanceof Error ? error.message : 'Failed to burn tokens');
     } finally {
       setLoading(false);
     }
@@ -221,23 +221,23 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
 
   const handleGrantMinterRole = async () => {
     if (!tokenContract) {
-      addToast('Token contract not initialized', 'error');
+      toast.error('Token contract not initialized');
       return;
     }
 
     if (!grantMinterAddress) {
-      addToast('Please enter an address', 'error');
+      toast.error('Please enter an address');
       return;
     }
 
     setLoading(true);
     try {
       await tokenContract.grantMinterRole(grantMinterAddress);
-      addToast(`Successfully granted minter role to ${grantMinterAddress}`, 'success');
+      toast.success(`Successfully granted minter role to ${grantMinterAddress}`);
       setGrantMinterAddress('');
     } catch (error) {
       console.error('Error granting minter role:', error);
-      addToast(error instanceof Error ? error.message : 'Failed to grant minter role', 'error');
+      toast.error(error instanceof Error ? error.message : 'Failed to grant minter role');
     } finally {
       setLoading(false);
     }
@@ -245,7 +245,7 @@ const TokenPage: React.FC<TokenPageProps> = ({ onBack }) => {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    addToast('Copied to clipboard!', 'success');
+    toast.success('Copied to clipboard!');
   };
 
   const formatBalance = () => {
