@@ -39,7 +39,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
     fixedRewardAmount: 0, // For fixed reward mode
     fundingGoal: 0, // For community-funded polls
     // New reward token fields
-    rewardTokenType: "custom" as "native" | "custom",
+    rewardTokenType: "native" as "native" | "custom", // Default to MASSA token
     voteRewardAmount: 10 // Reward amount per respondent (default 10 tokens)
   });
 
@@ -239,15 +239,9 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
       const distributionTypeMap = { "manual-pull": 0, "manual-push": 1, "autonomous": 2 };
       const rewardTokenTypeMap = { "native": 0, "custom": 1 };
 
-      // Calculate reward pool amount for native MASSA
-      // Poll creators transfer MASSA from their wallet to fund the poll
-      // MPOLLS tokens are minted (no upfront funding needed)
-      let rewardPoolAmount = 0;
-      if (formData.rewardTokenType === "native" && formData.fundingType === "self" && formData.voteRewardAmount > 0) {
-        // Estimate: reward for ~10 initial respondents
-        const estimatedRespondentRewards = formData.voteRewardAmount * 10;
-        rewardPoolAmount = estimatedRespondentRewards;
-      }
+      // Use the rewardPool specified by the user
+      // For native MASSA, this will be transferred from the user's wallet
+      const rewardPoolAmount = formData.rewardPool;
 
       const pollParams: PollCreationParams = {
         title: formData.title,
@@ -260,7 +254,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
         distributionType: distributionTypeMap[formData.distributionType],
         fixedRewardAmount: formData.fixedRewardAmount,
         fundingGoal: formData.fundingGoal,
-        rewardPoolAmount: rewardPoolAmount, // Automatically calculated based on reward configuration
+        rewardPoolAmount: rewardPoolAmount,
         rewardTokenType: rewardTokenTypeMap[formData.rewardTokenType],
         voteRewardAmount: formData.voteRewardAmount,
         createPollRewardAmount: 0 // Poll creators don't receive rewards - they fund the poll for respondents
@@ -289,7 +283,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
         rewardPool: 0,
         fixedRewardAmount: 0,
         fundingGoal: 0,
-        rewardTokenType: "custom",
+        rewardTokenType: "native",
         voteRewardAmount: 10
       });
 
@@ -373,7 +367,16 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
             </div>
           )}
 
-          <form className="poll-form" onSubmit={(e) => { e.preventDefault(); if (currentStep === totalSteps) createPoll(); }}>
+          <form className="poll-form" onSubmit={(e) => {
+            e.preventDefault();
+            // Only allow submission on the last step
+            if (currentStep === totalSteps) {
+              createPoll();
+            } else {
+              // On other steps, pressing Enter should advance to next step
+              nextStep();
+            }
+          }}>
             {/* Step Progress Indicator */}
             <div className="step-progress">
               <div className="step-progress-bar">
@@ -478,7 +481,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                 </div>
 
                 <div className="form-section">
-                  <h2>Contest Type</h2>
+                  <h2>Poll Type</h2>
 
                   <div className="form-group">
                     <label>Who can participate?</label>
@@ -518,32 +521,6 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                       />
                     </div>
                   )}
-
-                  <div className="form-group">
-                    <label>View Type</label>
-                    <div className="radio-group">
-                      <label className="radio-option">
-                        <input
-                          type="radio"
-                          name="viewType"
-                          value="text"
-                          checked={formData.viewType === "text"}
-                          onChange={(e) => setFormData(prev => ({ ...prev, viewType: e.target.value as "text" | "gallery" }))}
-                        />
-                        <span>Text view</span>
-                      </label>
-                      <label className="radio-option">
-                        <input
-                          type="radio"
-                          name="viewType"
-                          value="gallery"
-                          checked={formData.viewType === "gallery"}
-                          onChange={(e) => setFormData(prev => ({ ...prev, viewType: e.target.value as "text" | "gallery" }))}
-                        />
-                        <span>Gallery view</span>
-                      </label>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
@@ -597,71 +574,6 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
             {currentStep === 3 && (
               <div className="form-step">
                 <div className="form-section">
-                  <h2>Reward Token Configuration</h2>
-
-                  <div className="form-group">
-                    <label>Reward Token Type</label>
-                    <div className="radio-group">
-                      <label className="radio-option">
-                        <input
-                          type="radio"
-                          name="rewardTokenType"
-                          value="custom"
-                          checked={formData.rewardTokenType === "custom"}
-                          onChange={(e) => setFormData(prev => ({ ...prev, rewardTokenType: e.target.value as "native" | "custom" }))}
-                        />
-                        <span>MPOLLS Token</span>
-                      </label>
-                      <label className="radio-option">
-                        <input
-                          type="radio"
-                          name="rewardTokenType"
-                          value="native"
-                          checked={formData.rewardTokenType === "native"}
-                          onChange={(e) => setFormData(prev => ({ ...prev, rewardTokenType: e.target.value as "native" | "custom" }))}
-                        />
-                        <span>Native MASSA</span>
-                      </label>
-                    </div>
-                    <small>
-                      {formData.rewardTokenType === "custom" && "Rewards paid from your MPOLLS token balance. Make sure to approve the polls contract to spend your tokens before creating the poll."}
-                      {formData.rewardTokenType === "native" && "Rewards paid from poll's MASSA reward pool. Estimated respondent rewards will be included in the transaction."}
-                    </small>
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="voteRewardAmount">
-                      Reward per Respondent ({formData.rewardTokenType === "custom" ? "MPOLLS" : "MASSA"})
-                    </label>
-                    <input
-                      type="number"
-                      id="voteRewardAmount"
-                      value={formData.voteRewardAmount}
-                      onChange={(e) => setFormData(prev => ({ ...prev, voteRewardAmount: parseFloat(e.target.value) || 0 }))}
-                      min="0"
-                      step="0.1"
-                    />
-                    <small>
-                      Reward amount each respondent receives for participating in your poll
-                      {formData.rewardTokenType === "custom" && " (transferred from your MPOLLS wallet balance)"}
-                      {formData.rewardTokenType === "native" && " (transferred from your MASSA wallet balance)"}
-                    </small>
-                  </div>
-
-                  {formData.fundingType === "self" && formData.voteRewardAmount > 0 && formData.rewardTokenType === "native" && (
-                    <div className="info-banner">
-                      <strong>💡 Initial Funding:</strong> The poll creation transaction will include <strong>{formData.voteRewardAmount * 10} MASSA</strong> (reward for ~10 respondents at {formData.voteRewardAmount} MASSA each). You can add more funds to the poll later to support additional respondents.
-                    </div>
-                  )}
-
-                  {formData.fundingType === "self" && formData.voteRewardAmount > 0 && formData.rewardTokenType === "custom" && (
-                    <div className="info-banner">
-                      <strong>💡 Token Approval Required:</strong> Before creating this poll, you must approve the polls contract to spend <strong>{formData.voteRewardAmount * 10} MPOLLS</strong> tokens from your balance. The contract will transfer these tokens when you create the poll (reward for ~10 respondents at {formData.voteRewardAmount} MPOLLS each).
-                    </div>
-                  )}
-                </div>
-
-                <div className="form-section">
                   <h2>Funding Configuration</h2>
 
                   <div className="form-group">
@@ -699,7 +611,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                       </label>
                     </div>
                     <small>
-                      {formData.fundingType === "self" && "You can fund the poll after creation or during the poll lifetime"}
+                      {formData.fundingType === "self" && "You fund the poll upfront with MASSA tokens"}
                       {formData.fundingType === "community" && "Anyone can contribute funds to this poll before it ends"}
                       {formData.fundingType === "treasury" && "Requires admin approval before poll can be funded"}
                     </small>
@@ -714,7 +626,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                         value={formData.fundingGoal}
                         onChange={(e) => setFormData(prev => ({ ...prev, fundingGoal: parseFloat(e.target.value) || 0 }))}
                         min="0"
-                        step="0.001"
+                        step="0.1"
                       />
                       <small>Target amount for community contributions</small>
                     </div>
@@ -722,7 +634,29 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                 </div>
 
                 <div className="form-section">
-                  <h2>Distribution Settings</h2>
+                  <h2>Reward Distribution Settings</h2>
+
+                  <div className="form-group">
+                    <label htmlFor="rewardPool">Total Reward Pool (MASSA)</label>
+                    <input
+                      type="number"
+                      id="rewardPool"
+                      value={formData.rewardPool}
+                      onChange={(e) => {
+                        const pool = parseFloat(e.target.value) || 0;
+                        setFormData(prev => ({
+                          ...prev,
+                          rewardPool: pool,
+                          voteRewardAmount: pool // Keep voteRewardAmount in sync for backward compatibility
+                        }));
+                      }}
+                      min="0"
+                      step="0.1"
+                    />
+                    <small>
+                      Total amount of MASSA to allocate for rewarding poll respondents (transferred from your wallet)
+                    </small>
+                  </div>
 
                   <div className="form-group">
                     <label>Distribution Mode</label>
@@ -759,25 +693,62 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                       </label>
                     </div>
                     <small>
-                      {formData.distributionMode === "equal" && "Reward pool split equally among all voters"}
-                      {formData.distributionMode === "fixed" && "Fixed amount per voter until pool depletes"}
+                      {formData.distributionMode === "equal" && "Total pool split equally among a fixed number of respondents"}
+                      {formData.distributionMode === "fixed" && "Fixed amount per respondent until pool depletes"}
                       {formData.distributionMode === "weighted" && "Weighted by response quality (for surveys)"}
                     </small>
                   </div>
 
                   {formData.distributionMode === "fixed" && (
-                    <div className="form-group">
-                      <label htmlFor="fixedRewardAmount">Fixed Reward per Voter (MASSA)</label>
-                      <input
-                        type="number"
-                        id="fixedRewardAmount"
-                        value={formData.fixedRewardAmount}
-                        onChange={(e) => setFormData(prev => ({ ...prev, fixedRewardAmount: parseFloat(e.target.value) || 0 }))}
-                        min="0"
-                        step="0.001"
-                      />
-                      <small>Amount each voter receives (first-come, first-served)</small>
-                    </div>
+                    <>
+                      <div className="form-group">
+                        <label htmlFor="fixedRewardAmount">Fixed Reward per Respondent (MASSA)</label>
+                        <input
+                          type="number"
+                          id="fixedRewardAmount"
+                          value={formData.fixedRewardAmount}
+                          onChange={(e) => setFormData(prev => ({ ...prev, fixedRewardAmount: parseFloat(e.target.value) || 0 }))}
+                          min="0"
+                          step="0.1"
+                        />
+                        <small>Amount each respondent receives (first-come, first-served until pool depletes)</small>
+                      </div>
+                      {formData.rewardPool > 0 && formData.fixedRewardAmount > 0 && (
+                        <div className="info-banner">
+                          <strong>📊 Calculated:</strong> With a total pool of <strong>{formData.rewardPool} MASSA</strong> and fixed reward of <strong>{formData.fixedRewardAmount} MASSA</strong>, approximately <strong>{Math.floor(formData.rewardPool / formData.fixedRewardAmount)}</strong> respondents can be rewarded.
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {formData.distributionMode === "equal" && (
+                    <>
+                      <div className="form-group">
+                        <label htmlFor="maxRespondents">Maximum Number of Respondents</label>
+                        <input
+                          type="number"
+                          id="maxRespondents"
+                          value={formData.rewardPool > 0 && formData.fixedRewardAmount > 0 ? Math.floor(formData.rewardPool / formData.fixedRewardAmount) : 10}
+                          onChange={(e) => {
+                            const maxRespondents = parseInt(e.target.value) || 10;
+                            // Calculate fixedRewardAmount based on pool and max respondents
+                            const rewardPerRespondent = formData.rewardPool > 0 ? formData.rewardPool / maxRespondents : 0;
+                            setFormData(prev => ({
+                              ...prev,
+                              fixedRewardAmount: rewardPerRespondent
+                            }));
+                          }}
+                          min="1"
+                          step="1"
+                        />
+                        <small>How many respondents will share the total reward pool equally</small>
+                      </div>
+                      {formData.rewardPool > 0 && formData.fixedRewardAmount > 0 && (
+                        <div className="info-banner">
+                          <strong>📊 Calculated:</strong> Each respondent will receive <strong>{formData.fixedRewardAmount.toFixed(4)} MASSA</strong> (total pool: {formData.rewardPool} MASSA ÷ {Math.floor(formData.rewardPool / formData.fixedRewardAmount)} respondents).
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <div className="form-group">
@@ -815,8 +786,8 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                       </label>
                     </div>
                     <small>
-                      {formData.distributionType === "manual-pull" && "Voters claim their rewards after poll ends"}
-                      {formData.distributionType === "manual-push" && "You trigger reward distribution to all voters"}
+                      {formData.distributionType === "manual-pull" && "Respondents claim their rewards after poll ends"}
+                      {formData.distributionType === "manual-push" && "You trigger reward distribution to all respondents"}
                       {formData.distributionType === "autonomous" && "Automatic distribution by smart contract when poll ends"}
                     </small>
                   </div>
