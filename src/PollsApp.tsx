@@ -40,7 +40,7 @@ interface Poll extends Omit<ContractPoll, 'id' | 'votes'> {
   rewardsDistributed: boolean;
 }
 
-type PageType = 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap';
+type PageType = 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap' | 'creator' | 'participant';
 
 interface PollsAppProps {
   initialView?: PageType;
@@ -433,48 +433,6 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
     <>
       <Navigation onNavigate={handleNavigation} currentPage={currentView} />
       <div className="polls-app">
-        <header className="polls-header">
-          <div className="header-content">
-            <div className="header-left">
-              <h1><HowToVoteIcon sx={{ fontSize: 32, marginRight: 1, verticalAlign: 'middle' }} /> Massa Polls</h1>
-              <p>Decentralized voting on the Massa blockchain</p>
-            </div>
-            <div className="header-right">
-              <a 
-                href="https://explorer.massa.net/mainnet" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="explorer-link"
-              >
-                <LinkIcon sx={{ fontSize: 16, marginRight: 0.5, verticalAlign: 'middle' }} /> Massa Explorer
-              </a>
-              <a
-                href={`https://explorer.massa.net/mainnet/address/${CONTRACT_CREATOR_ADDRESS}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="explorer-link-small"
-              >
-                <LinkIcon sx={{ fontSize: 16 }} />
-              </a>
-            </div>
-          </div>
-        </header>
-        
-        <div className="contract-info-header">
-          <div className="contract-details">
-            <span className="contract-label"><PlaceIcon sx={{ fontSize: 16, marginRight: 0.5, verticalAlign: 'middle' }} /> Contract:</span>
-            <span className="contract-address">{pollsContract.getContractAddress()}</span>
-            <a 
-              href={pollsContract.getExplorerUrl()}
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="explorer-link-small"
-            >
-              <LinkIcon sx={{ fontSize: 16 }} />
-            </a>
-          </div>
-        </div>
-
       {selectedPoll ? (
         <div className="poll-detail">
           <button

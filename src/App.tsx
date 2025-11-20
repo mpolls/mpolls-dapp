@@ -4,6 +4,8 @@ import PollsApp from './PollsApp';
 import ProjectsPage from './ProjectsPage';
 import TokenPage from './TokenPage';
 import SwapPage from './SwapPage';
+import CreatorDashboard from './CreatorDashboard';
+import ParticipantDashboard from './ParticipantDashboard';
 import Navigation from './components/Navigation';
 import { pollsContract, ContractPoll } from './utils/contractInteraction';
 import { ToastProvider } from './components/ToastContainer';
@@ -14,7 +16,7 @@ import TableChartIcon from '@mui/icons-material/TableChart';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import './App.css';
 
-type PageType = 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap';
+type PageType = 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap' | 'creator' | 'participant';
 
 function App() {
   const [currentText, setCurrentText] = useState(0);
@@ -150,6 +152,45 @@ function App() {
               sessionStorage.setItem('selectedProjectId', projectId.toString());
             }
             handleNavigation('create');
+          }}
+        />
+      </ToastProvider>
+    );
+  }
+
+  if (currentPage === 'creator') {
+    return (
+      <ToastProvider>
+        <Navigation
+          onNavigate={handleNavigation}
+          currentPage={currentPage}
+          onWalletConnect={handleWalletConnect}
+        />
+        <CreatorDashboard
+          onBack={() => handleNavigation('polls')}
+          onViewPoll={(pollId) => {
+            // Navigate to polls page which will handle poll selection
+            handleNavigation('polls');
+            // Note: The actual poll selection would need to be handled in PollsApp
+          }}
+        />
+      </ToastProvider>
+    );
+  }
+
+  if (currentPage === 'participant') {
+    return (
+      <ToastProvider>
+        <Navigation
+          onNavigate={handleNavigation}
+          currentPage={currentPage}
+          onWalletConnect={handleWalletConnect}
+        />
+        <ParticipantDashboard
+          onBack={() => handleNavigation('polls')}
+          onViewPoll={(pollId) => {
+            // Navigate to polls page to view the poll
+            handleNavigation('polls');
           }}
         />
       </ToastProvider>
