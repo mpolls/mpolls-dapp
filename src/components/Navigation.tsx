@@ -12,11 +12,13 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import PeopleIcon from '@mui/icons-material/People';
 import { pollsContract } from '../utils/contractInteraction';
 
 interface NavigationProps {
-  onNavigate: (page: 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap') => void;
-  currentPage: 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap';
+  onNavigate: (page: 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap' | 'creator' | 'participant') => void;
+  currentPage: 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap' | 'creator' | 'participant';
   onScrollToSection?: (sectionId: string) => void;
   onWalletConnect?: (address: string, name: string) => void;
 }
@@ -28,7 +30,9 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, currentPage, onScro
   const [isConnecting, setIsConnecting] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [showRoleMenu, setShowRoleMenu] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const roleMenuRef = useRef<HTMLDivElement>(null);
 
   // Check wallet connection on mount
   useEffect(() => {
@@ -40,6 +44,9 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, currentPage, onScro
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowDropdown(false);
+      }
+      if (roleMenuRef.current && !roleMenuRef.current.contains(event.target as Node)) {
+        setShowRoleMenu(false);
       }
     };
 
@@ -280,15 +287,64 @@ const Navigation: React.FC<NavigationProps> = ({ onNavigate, currentPage, onScro
             <span className="bottom-nav-label">Create</span>
           </button>
 
-          <button
-            className={`bottom-nav-item ${currentPage === 'admin' ? 'active' : ''}`}
-            onClick={() => onNavigate('admin')}
-          >
-            <div className="bottom-nav-icon">
-              <SettingsIcon sx={{ fontSize: 24 }} />
-            </div>
-            <span className="bottom-nav-label">Admin</span>
-          </button>
+          <div className="bottom-nav-item-container" ref={roleMenuRef}>
+            <button
+              className={`bottom-nav-item ${['admin', 'creator', 'participant'].includes(currentPage) ? 'active' : ''}`}
+              onClick={() => setShowRoleMenu(!showRoleMenu)}
+            >
+              <div className="bottom-nav-icon">
+                <SettingsIcon sx={{ fontSize: 24 }} />
+              </div>
+              <span className="bottom-nav-label">Menu</span>
+            </button>
+
+            {showRoleMenu && (
+              <div className="role-menu-dropdown">
+                <div className="role-menu-header">
+                  <span className="role-menu-title">Select Role</span>
+                </div>
+                <button
+                  className={`role-menu-item ${currentPage === 'admin' ? 'active' : ''}`}
+                  onClick={() => {
+                    onNavigate('admin');
+                    setShowRoleMenu(false);
+                  }}
+                >
+                  <SettingsIcon sx={{ fontSize: 20, marginRight: '12px' }} />
+                  <div className="role-menu-item-content">
+                    <span className="role-menu-item-title">Admin</span>
+                    <span className="role-menu-item-desc">Contract & system management</span>
+                  </div>
+                </button>
+                <button
+                  className={`role-menu-item ${currentPage === 'creator' ? 'active' : ''}`}
+                  onClick={() => {
+                    onNavigate('creator');
+                    setShowRoleMenu(false);
+                  }}
+                >
+                  <AttachMoneyIcon sx={{ fontSize: 20, marginRight: '12px' }} />
+                  <div className="role-menu-item-content">
+                    <span className="role-menu-item-title">Creator</span>
+                    <span className="role-menu-item-desc">Fund & manage your polls</span>
+                  </div>
+                </button>
+                <button
+                  className={`role-menu-item ${currentPage === 'participant' ? 'active' : ''}`}
+                  onClick={() => {
+                    onNavigate('participant');
+                    setShowRoleMenu(false);
+                  }}
+                >
+                  <PeopleIcon sx={{ fontSize: 20, marginRight: '12px' }} />
+                  <div className="role-menu-item-content">
+                    <span className="role-menu-item-title">Participant</span>
+                    <span className="role-menu-item-desc">Your votes & rewards</span>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </nav>
       )}
