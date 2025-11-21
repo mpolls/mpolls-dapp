@@ -1328,6 +1328,83 @@ export class PollsContract {
     }
   }
 
+  async getPollVotersAndClaims(pollId: string): Promise<{
+    voters: Array<{ address: string; option: number; hasClaimed: boolean; claimAmount?: number }>;
+    totalVotes: number;
+    totalClaimed: number;
+  }> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      console.log(`🔍 Fetching voters and claims for poll #${pollId}...`);
+
+      // Get all events from the contract
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      console.log(`📋 Total events found: ${events.length}`);
+
+      // Parse vote events for this poll
+      const votePattern = new RegExp(`Vote cast by (AU[A-Za-z0-9]+) for option (\\d+) in poll ${pollId}`);
+      const claimPattern = new RegExp(`Reward claimed: (\\d+) nanoMASSA by (AU[A-Za-z0-9]+) from poll ${pollId}`);
+
+      const votersMap = new Map<string, { address: string; option: number; hasClaimed: boolean; claimAmount?: number }>();
+
+      // First, collect all voters from vote events
+      for (const event of events) {
+        const voteMatch = event.data.match(votePattern);
+        if (voteMatch) {
+          const voterAddress = voteMatch[1];
+          const optionIndex = parseInt(voteMatch[2]);
+
+          if (!votersMap.has(voterAddress)) {
+            votersMap.set(voterAddress, {
+              address: voterAddress,
+              option: optionIndex,
+              hasClaimed: false
+            });
+          }
+        }
+      }
+
+      // Then, mark voters who have claimed
+      let totalClaimed = 0;
+      for (const event of events) {
+        const claimMatch = event.data.match(claimPattern);
+        if (claimMatch) {
+          const claimAmount = parseInt(claimMatch[1]);
+          const voterAddress = claimMatch[2];
+
+          const voter = votersMap.get(voterAddress);
+          if (voter) {
+            voter.hasClaimed = true;
+            voter.claimAmount = claimAmount;
+            totalClaimed++;
+          }
+        }
+      }
+
+      const voters = Array.from(votersMap.values());
+
+      console.log(`✅ Found ${voters.length} voters, ${totalClaimed} have claimed rewards`);
+
+      return {
+        voters,
+        totalVotes: voters.length,
+        totalClaimed
+      };
+    } catch (error) {
+      console.error("Error fetching poll voters and claims:", error);
+      return {
+        voters: [],
+        totalVotes: 0,
+        totalClaimed: 0
+      };
+    }
+  }
+
   // ================= PROJECT MANAGEMENT METHODS =================
 
   async createProject(params: ProjectCreationParams): Promise<string> {
