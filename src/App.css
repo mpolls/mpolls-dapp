@@ -5214,6 +5214,142 @@ html, body {
   font-size: 20px;
 }
 
+/* Voter Reward Section */
+.voter-reward-section {
+  margin-top: 30px;
+  background: linear-gradient(135deg, #f6f9fc 0%, #e9f2ff 100%);
+  border-radius: 12px;
+  padding: 24px;
+  border: 2px solid #e2e8f0;
+}
+
+.voter-reward-section h3 {
+  font-size: 20px;
+  color: #2d3748;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+}
+
+.reward-info-card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.reward-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f7fafc;
+}
+
+.reward-info-row:last-child {
+  border-bottom: none;
+}
+
+.reward-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+.reward-value {
+  font-size: 14px;
+  color: #2d3748;
+  text-align: right;
+}
+
+.reward-value.highlight {
+  font-size: 18px;
+  font-weight: 700;
+  color: #11998e;
+}
+
+.claim-reward-section {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.claim-reward-btn {
+  padding: 14px 32px;
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(17, 153, 142, 0.3);
+}
+
+.claim-reward-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(17, 153, 142, 0.4);
+}
+
+.claim-help-text {
+  margin-top: 12px;
+  font-size: 14px;
+  color: #718096;
+}
+
+.rewards-distributed-notice {
+  margin-top: 20px;
+  padding: 12px 20px;
+  background: #c6f6d5;
+  border-radius: 8px;
+  color: #22543d;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Poll Status Notices */
+.poll-ended-notice {
+  padding: 14px 20px;
+  background: #fed7d7;
+  border: 2px solid #fc8181;
+  border-radius: 8px;
+  color: #c53030;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.already-voted-notice {
+  padding: 14px 20px;
+  background: #c6f6d5;
+  border: 2px solid #68d391;
+  border-radius: 8px;
+  color: #22543d;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.vote-btn.inactive {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: #e2e8f0;
+}
+
+.vote-btn.inactive:hover {
+  transform: none;
+  box-shadow: none;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .dashboard-stats {

@@ -56,8 +56,8 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
 
   const filteredPolls = polls.filter(poll => {
     const statusMatch = filterStatus === 'all' ||
-      (filterStatus === 'active' && poll.isActive) ||
-      (filterStatus === 'ended' && !poll.isActive);
+      (filterStatus === 'active' && poll.status === 'active') ||
+      (filterStatus === 'ended' && poll.status !== 'active');
 
     const fundingMatch = filterFundingType === 'all' || poll.fundingType === filterFundingType;
 
@@ -147,12 +147,12 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
 
   // Calculate dashboard stats
   const totalPolls = polls.length;
-  const activePolls = polls.filter(p => p.isActive).length;
+  const activePolls = polls.filter(p => p.status === 'active').length;
   const totalFunding = polls.reduce((sum, poll) => sum + (poll.rewardPool || 0), 0) / 1e9;
   const poolsNeedingFunds = polls.filter(p => {
     const poolInMassa = (p.rewardPool || 0) / 1e9;
     const capacity = calculateRespondentCapacity(poolInMassa, (p.fixedRewardAmount || 0) / 1e9);
-    return p.isActive && capacity < 5;
+    return p.status === 'active' && capacity < 5;
   }).length;
 
   if (isLoading) {
@@ -342,7 +342,7 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
                   const poolInMassa = (poll.rewardPool || 0) / 1e9;
                   const fixedRewardInMassa = (poll.fixedRewardAmount || 0) / 1e9;
                   const capacity = calculateRespondentCapacity(poolInMassa, fixedRewardInMassa);
-                  const needsFunding = poll.isActive && capacity < 5;
+                  const needsFunding = poll.status === 'active' && capacity < 5;
 
                   return (
                     <tr key={poll.id} className={needsFunding ? 'needs-funding' : ''}>
@@ -360,8 +360,8 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
                         </div>
                       </td>
                       <td>
-                        <span className={`status-badge ${poll.isActive ? 'active' : 'ended'}`}>
-                          {poll.isActive ? 'Active' : 'Ended'}
+                        <span className={`status-badge ${poll.status === 'active' ? 'active' : 'ended'}`}>
+                          {poll.status === 'active' ? 'Active' : 'Ended'}
                         </span>
                       </td>
                       <td>{getFundingTypeBadge(poll.fundingType || 0)}</td>

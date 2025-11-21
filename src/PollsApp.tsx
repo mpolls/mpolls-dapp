@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import CreatePoll from "./CreatePoll";
 import AdminPage from "./AdminPage";
 import Navigation from "./components/Navigation";
-import PollFunding from "./components/PollFunding";
 import { pollsContract, ContractPoll } from "./utils/contractInteraction";
 import { parseBlockchainError, logError } from "./utils/errorHandling";
 import { useToast } from "./components/ToastContainer";
@@ -149,7 +148,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
         console.log(`   Options: [${contractPoll.options.map(opt => `"${opt}"`).join(", ")}]`);
         console.log(`   Creator: ${contractPoll.creator}`);
         console.log(`   Votes: [${contractPoll.votes.join(", ")}]`);
-        console.log(`   Is Active: ${contractPoll.isActive}`);
+        console.log(`   Status: ${contractPoll.status}`);
         console.log(`   Created At: ${new Date(contractPoll.createdAt).toLocaleString()}`);
       });
       
@@ -170,10 +169,9 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
           options: contractPoll.options,
           votes: contractPoll.votes,
           totalVotes,
-          timeLeft: contractPoll.isActive ? "Active" : "Ended",
+          timeLeft: contractPoll.status === 'active' ? "Active" : "Ended",
           creator: contractPoll.creator,
           rewards: rewardsDisplay,
-          isActive: contractPoll.isActive,
           createdAt: contractPoll.createdAt,
           endTime: contractPoll.endTime,
           status: contractPoll.status,
@@ -315,14 +313,13 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
     if (poll) {
       console.log(`   Poll ID: ${poll.id}`);
       console.log(`   Poll Title: "${poll.title}"`);
-      console.log(`   Poll isActive: ${poll.isActive}`);
       console.log(`   Poll status: ${poll.status}`);
       console.log(`   Poll endTime: ${new Date(poll.endTime).toLocaleString()} (${poll.endTime})`);
       console.log(`   Current time: ${new Date().toLocaleString()} (${Date.now()})`);
       console.log(`   Time remaining: ${poll.endTime - Date.now()}ms`);
     }
-    
-    if (!poll || !poll.isActive) {
+
+    if (!poll || poll.status !== 'active') {
       console.log(`❌ Vote blocked: Poll ${pollId} is ${!poll ? 'not found' : 'inactive'}`);
       setVotingStatus({
         pollId,
@@ -359,7 +356,47 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
       }
       
       console.log(`✅ Vote allowed: User has not voted on poll ${pollId}, proceeding...`);
-      
+
+      // Check if poll is still active (based on cached status)
+      if (poll.status !== 'active') {
+        toast.error('This poll has ended. Voting is no longer allowed.');
+        setVotingStatus({
+          pollId: null,
+          isVoting: false,
+          message: '',
+          type: null
+        });
+        return;
+      }
+
+      // Additional client-side time check (in case poll just ended)
+      const currentTime = Date.now();
+      if (poll.endTime && currentTime > poll.endTime) {
+        toast.error('This poll has just ended. Voting is no longer allowed.');
+        console.log(`⏰ Poll ${pollId} has ended. EndTime: ${new Date(poll.endTime).toLocaleString()}, Current: ${new Date(currentTime).toLocaleString()}`);
+
+        // Update the poll status locally to reflect it's ended
+        setPolls(prevPolls =>
+          prevPolls.map(p =>
+            p.id === pollId ? { ...p, status: 'ended', timeLeft: 'Ended' } : p
+          )
+        );
+
+        setVotingStatus({
+          pollId: null,
+          isVoting: false,
+          message: '',
+          type: null
+        });
+        return;
+      }
+
+      console.log(`✅ All pre-vote checks passed!`);
+      console.log(`   ✓ User has not voted`);
+      console.log(`   ✓ Poll status: ${poll.status}`);
+      console.log(`   ✓ Poll end time check: ${poll.endTime ? `${((poll.endTime - Date.now()) / 1000).toFixed(0)}s remaining` : 'N/A'}`);
+      console.log(`   → Proceeding with blockchain vote submission...`);
+
       // Update voting state
       setVotingStatus({
         pollId,
@@ -367,7 +404,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
         message: 'Submitting your vote to the blockchain...',
         type: 'info'
       });
-      
+
       // Call the contract to vote
       console.log(`📝 Submitting vote: Poll ${pollId}, Option ${optionIndex}`);
       await pollsContract.vote(pollId.toString(), optionIndex);
@@ -454,7 +491,23 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
 
             <div className="voting-section">
               <h3>Cast Your Vote</h3>
-              
+
+              {/* Poll Ended Notice */}
+              {(selectedPoll.status !== 'active' || (selectedPoll.endTime && Date.now() > selectedPoll.endTime)) && (
+                <div className="poll-ended-notice">
+                  <ErrorIcon sx={{ fontSize: 20, marginRight: 0.5 }} />
+                  This poll has ended. Voting is no longer allowed.
+                </div>
+              )}
+
+              {/* Already Voted Notice */}
+              {votedPolls.has(selectedPoll.id) && selectedPoll.status === 'active' && selectedPoll.endTime && Date.now() <= selectedPoll.endTime && (
+                <div className="already-voted-notice">
+                  <CheckCircleIcon sx={{ fontSize: 20, marginRight: 0.5 }} />
+                  You've already voted on this poll.
+                </div>
+              )}
+
               {/* Voting Status Messages */}
               {votingStatus.message && (
                 <div className={`voting-feedback voting-${votingStatus.type}`}>
@@ -462,13 +515,15 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                   {votingStatus.message}
                 </div>
               )}
-              {selectedPoll.options.map((option, index) => (
+              {selectedPoll.options.map((option, index) => {
+                const isPollEnded = selectedPoll.status !== 'active' || (selectedPoll.endTime && Date.now() > selectedPoll.endTime);
+                return (
                 <div key={index} className="vote-option">
                   <button
-                    className={`vote-btn ${votedPolls.has(selectedPoll.id) ? 'voted' : ''} ${!selectedPoll.isActive ? 'inactive' : ''}`}
+                    className={`vote-btn ${votedPolls.has(selectedPoll.id) ? 'voted' : ''} ${isPollEnded ? 'inactive' : ''}`}
                     onClick={() => handleVote(selectedPoll.id, index)}
-                    disabled={votedPolls.has(selectedPoll.id) || !selectedPoll.isActive || votingStatus.isVoting}
-                    title={!selectedPoll.isActive ? 'This poll is no longer active' : ''}
+                    disabled={votedPolls.has(selectedPoll.id) || isPollEnded || votingStatus.isVoting}
+                    title={isPollEnded ? 'This poll has ended' : votedPolls.has(selectedPoll.id) ? 'You already voted' : ''}
                   >
                     {option}
                   </button>
@@ -482,7 +537,8 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                     {selectedPoll.votes[index]} votes ({getVotePercentage(selectedPoll.votes[index], selectedPoll.totalVotes)}%)
                   </span>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="poll-stats">
@@ -492,102 +548,97 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
               </div>
               <div className="stat">
                 <h4>Time Remaining</h4>
-                <p>{selectedPoll.timeLeft}</p>
+                <p>{formatTimeRemaining(selectedPoll.endTime, selectedPoll.status === 'active')}</p>
               </div>
               <div className="stat">
-                <h4>Reward Pool</h4>
-                <p>{selectedPoll.rewards}</p>
+                <h4>Status</h4>
+                <p>{selectedPoll.status === 'active' ? '🟢 Active' : '🔴 Ended'}</p>
               </div>
             </div>
 
-            {/* Economics & Funding Section */}
-            <div className="poll-economics-section">
-              <PollFunding
-                pollId={selectedPoll.id.toString()}
-                fundingType={selectedPoll.fundingType}
-                fundingGoal={selectedPoll.fundingGoal}
-                currentPool={selectedPoll.rewardPool}
-                isActive={selectedPoll.isActive}
-                creator={selectedPoll.creator}
-              />
-
-              <div className="distribution-info">
+            {/* Voter Reward Information */}
+            {selectedPoll.rewardPool > 0 && (
+              <div className="voter-reward-section">
                 <h3>
                   <EmojiEventsIcon sx={{ fontSize: 22, marginRight: 0.5, verticalAlign: 'middle' }} />
-                  Reward Distribution
+                  Earn Rewards for Participating
                 </h3>
-                <div className="distribution-details">
-                  <div className="distribution-item">
-                    <span className="label">Mode:</span>
-                    <span className="value">
-                      {selectedPoll.distributionMode === 0 && 'Equal Split'}
-                      {selectedPoll.distributionMode === 1 && 'Fixed Reward'}
-                      {selectedPoll.distributionMode === 2 && 'Weighted Quality'}
-                    </span>
+                <div className="reward-info-card">
+                  <div className="reward-info-row">
+                    <span className="reward-label">Reward Pool:</span>
+                    <span className="reward-value highlight">{selectedPoll.rewards}</span>
                   </div>
-                  <div className="distribution-item">
-                    <span className="label">Type:</span>
-                    <span className="value">
-                      {selectedPoll.distributionType === 0 && 'Manual Pull (Voters Claim)'}
-                      {selectedPoll.distributionType === 1 && 'Manual Push (Creator Distributes)'}
-                      {selectedPoll.distributionType === 2 && 'Autonomous (Automatic)'}
-                    </span>
-                  </div>
+
                   {selectedPoll.distributionMode === 1 && selectedPoll.fixedRewardAmount > 0 && (
-                    <div className="distribution-item">
-                      <span className="label">Fixed Amount:</span>
-                      <span className="value">{selectedPoll.fixedRewardAmount.toFixed(4)} MASSA per voter</span>
+                    <div className="reward-info-row">
+                      <span className="reward-label">You'll Earn:</span>
+                      <span className="reward-value highlight">{selectedPoll.fixedRewardAmount.toFixed(4)} MASSA</span>
                     </div>
                   )}
-                  {selectedPoll.rewardsDistributed && (
-                    <div className="distribution-item">
-                      <span className="label">Status:</span>
-                      <span className="value distributed">✓ Rewards Distributed</span>
+
+                  {selectedPoll.distributionMode === 0 && selectedPoll.totalVotes > 0 && (
+                    <div className="reward-info-row">
+                      <span className="reward-label">Est. Reward per Voter:</span>
+                      <span className="reward-value highlight">
+                        {((selectedPoll.rewardPool / selectedPoll.totalVotes) || 0).toFixed(4)} MASSA
+                      </span>
                     </div>
                   )}
+
+                  <div className="reward-info-row">
+                    <span className="reward-label">Distribution:</span>
+                    <span className="reward-value">
+                      {selectedPoll.distributionMode === 0 && 'Equal Split Among All Voters'}
+                      {selectedPoll.distributionMode === 1 && 'Fixed Amount Per Voter'}
+                      {selectedPoll.distributionMode === 2 && 'Based on Response Quality'}
+                    </span>
+                  </div>
+
+                  <div className="reward-info-row">
+                    <span className="reward-label">How to Claim:</span>
+                    <span className="reward-value">
+                      {selectedPoll.distributionType === 0 && 'You claim after poll ends'}
+                      {selectedPoll.distributionType === 1 && 'Creator distributes to voters'}
+                      {selectedPoll.distributionType === 2 && 'Automatic distribution'}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Claim/Distribute Actions */}
-                {!selectedPoll.isActive && !selectedPoll.rewardsDistributed && selectedPoll.rewardPool > 0 && (
-                  <div className="reward-actions">
-                    {selectedPoll.distributionType === 0 && votedPolls.has(selectedPoll.id) && (
-                      <button
-                        className="claim-reward-btn"
-                        onClick={async () => {
-                          try {
-                            await pollsContract.claimReward(selectedPoll.id.toString());
-                            toast.success('Reward claimed successfully!');
-                            fetchPolls();
-                          } catch (err) {
-                            toast.error('Failed to claim reward: ' + (err instanceof Error ? err.message : 'Unknown error'));
-                          }
-                        }}
-                      >
-                        <AttachMoneyIcon sx={{ fontSize: 18, marginRight: 0.5 }} />
-                        Claim Your Reward
-                      </button>
-                    )}
-                    {selectedPoll.distributionType === 1 && walletAddress === selectedPoll.creator && (
-                      <button
-                        className="distribute-rewards-btn"
-                        onClick={async () => {
-                          try {
-                            await pollsContract.distributeRewards(selectedPoll.id.toString());
-                            toast.success('Rewards distribution initiated!');
-                            fetchPolls();
-                          } catch (err) {
-                            toast.error('Failed to distribute rewards: ' + (err instanceof Error ? err.message : 'Unknown error'));
-                          }
-                        }}
-                      >
-                        <AttachMoneyIcon sx={{ fontSize: 18, marginRight: 0.5 }} />
-                        Distribute Rewards
-                      </button>
-                    )}
+                {/* Claim Reward Button for Voters */}
+                {selectedPoll.status !== 'active' &&
+                 !selectedPoll.rewardsDistributed &&
+                 selectedPoll.distributionType === 0 &&
+                 votedPolls.has(selectedPoll.id) && (
+                  <div className="claim-reward-section">
+                    <button
+                      className="claim-reward-btn"
+                      onClick={async () => {
+                        try {
+                          await pollsContract.claimReward(selectedPoll.id.toString());
+                          toast.success('Reward claimed successfully!');
+                          fetchPolls();
+                        } catch (err) {
+                          toast.error('Failed to claim reward: ' + (err instanceof Error ? err.message : 'Unknown error'));
+                        }
+                      }}
+                    >
+                      <AttachMoneyIcon sx={{ fontSize: 18, marginRight: 0.5 }} />
+                      Claim Your Reward
+                    </button>
+                    <p className="claim-help-text">
+                      The poll has ended. Click to claim your reward!
+                    </p>
+                  </div>
+                )}
+
+                {selectedPoll.rewardsDistributed && votedPolls.has(selectedPoll.id) && (
+                  <div className="rewards-distributed-notice">
+                    <CheckCircleIcon sx={{ fontSize: 20, marginRight: 0.5 }} />
+                    Rewards have been distributed for this poll
                   </div>
                 )}
               </div>
-            </div>
+            )}
           </div>
         </div>
       ) : (
@@ -685,7 +736,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                       {polls.map(poll => (
                         <tr
                           key={poll.id}
-                          className={`poll-row ${!poll.isActive ? 'poll-inactive' : ''}`}
+                          className={`poll-row ${poll.status !== 'active' ? 'poll-inactive' : ''}`}
                           onClick={() => setSelectedPoll(poll)}
                         >
                           <td className="td-poll">
@@ -731,8 +782,8 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                             </span>
                           </td>
                           <td className="td-time">
-                            <span className={`time-remaining ${getTimeUrgencyClass(poll.endTime, poll.isActive)}`}>
-                              {formatTimeRemaining(poll.endTime, poll.isActive)}
+                            <span className={`time-remaining ${getTimeUrgencyClass(poll.endTime, poll.status === 'active')}`}>
+                              {formatTimeRemaining(poll.endTime, poll.status === 'active')}
                             </span>
                           </td>
                         </tr>
@@ -748,14 +799,14 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                   {polls.map(poll => (
                     <div
                       key={poll.id}
-                      className={`poll-card-classic ${!poll.isActive ? 'poll-inactive' : ''}`}
+                      className={`poll-card-classic ${poll.status !== 'active' ? 'poll-inactive' : ''}`}
                       onClick={() => setSelectedPoll(poll)}
                     >
                       <div className="poll-card-header">
                         <div className="poll-card-title-row">
                           <h3>{poll.title}</h3>
-                          <span className={`status-pill ${poll.isActive ? 'active' : 'ended'}`}>
-                            {poll.isActive ? 'Active' : 'Ended'}
+                          <span className={`status-pill ${poll.status === 'active' ? 'active' : 'ended'}`}>
+                            {poll.status === 'active' ? 'Active' : 'Ended'}
                           </span>
                         </div>
                         <p className="poll-card-description">{poll.description}</p>
@@ -773,10 +824,10 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                           <span className="stat-icon"><CalendarTodayIcon sx={{ fontSize: 28 }} /></span>
                           <div className="stat-details">
                             <span className="stat-value">
-                              {poll.isActive ? formatTimeRemaining(poll.endTime, poll.isActive) : 'Ended'}
+                              {poll.status === 'active' ? formatTimeRemaining(poll.endTime, poll.status === 'active') : 'Ended'}
                             </span>
                             <span className="stat-label">
-                              {poll.isActive ? new Date(poll.endTime).toLocaleDateString() : new Date(poll.endTime).toLocaleDateString()}
+                              {new Date(poll.endTime).toLocaleDateString()}
                             </span>
                           </div>
                         </div>
@@ -784,13 +835,13 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
 
                       <div className="poll-card-footer">
                         <button className="poll-action-btn">
-                          {poll.isActive ? 'View Results' : 'Edit & Publish'}
+                          {poll.status === 'active' ? 'View Results' : 'Edit & Publish'}
                         </button>
                         <div className="poll-card-menu"><MoreVertIcon sx={{ fontSize: 20 }} /></div>
                       </div>
 
                       <div className="poll-card-meta">
-                        <span className="poll-created">Created {new Date(poll.endTime - (poll.isActive ? 7 * 24 * 60 * 60 * 1000 : 0)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                        <span className="poll-created">Created {new Date(poll.endTime - (poll.status === 'active' ? 7 * 24 * 60 * 60 * 1000 : 0)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                       </div>
                     </div>
                   ))}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { pollsContract, PollCreationParams, ContractProject } from "./utils/contractInteraction";
 import { parseBlockchainError, logError } from "./utils/errorHandling";
+import { useToast } from "./components/ToastContainer";
 import PlaceIcon from '@mui/icons-material/Place';
 import LinkIcon from '@mui/icons-material/Link';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -14,6 +15,8 @@ interface CreatePollProps {
 }
 
 const CreatePoll = ({ onBack }: CreatePollProps) => {
+  const toast = useToast();
+
   // Calculate default end date/time (7 days from now)
   const getDefaultEndDateTime = () => {
     const date = new Date();
@@ -54,6 +57,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
   // Multi-step form state
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
+  const [isStepChanging, setIsStepChanging] = useState(false);
 
   useEffect(() => {
     checkWalletConnection();
@@ -182,6 +186,8 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
   };
 
   const nextStep = () => {
+    console.log('➡️ nextStep clicked - Current step:', currentStep, '→', currentStep + 1);
+
     const validationError = validateStep(currentStep);
     if (validationError) {
       setError(validationError);
@@ -189,9 +195,17 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
     }
 
     if (currentStep < totalSteps) {
+      setIsStepChanging(true);
       setCurrentStep(currentStep + 1);
       setError("");
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      console.log('✅ Step advanced to:', currentStep + 1);
+
+      // Reset step changing flag after a short delay
+      setTimeout(() => {
+        setIsStepChanging(false);
+        console.log('🔓 Step transition complete');
+      }, 100);
     }
   };
 
@@ -204,6 +218,20 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
   };
 
   const createPoll = async () => {
+    console.log('🔍 createPoll called - Current step:', currentStep, 'Total steps:', totalSteps, 'isStepChanging:', isStepChanging);
+
+    // CRITICAL: Block if we're in the middle of a step transition
+    if (isStepChanging) {
+      console.warn('⚠️ Blocked createPoll attempt - step transition in progress!');
+      return;
+    }
+
+    // CRITICAL: Only allow poll creation on the final step
+    if (currentStep !== totalSteps) {
+      console.warn('⚠️ Blocked createPoll attempt - not on final step!');
+      return;
+    }
+
     const validationError = validateForm();
     if (validationError) {
       setError(validationError);
@@ -264,6 +292,8 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
       // Call the contract to create the poll
       const pollId = await pollsContract.createPoll(pollParams);
 
+      // Show success toast
+      toast.success(`🎉 Poll created successfully! Poll ID: ${pollId}`, 3000);
       setSuccess(`Poll created successfully! Poll ID: ${pollId}. Redirecting to polls list...`);
 
       // Reset form
@@ -295,7 +325,11 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
     } catch (err) {
       logError(err, { action: 'creating poll' });
       const friendlyError = parseBlockchainError(err, { action: 'creating poll' });
-      setError(`${friendlyError.message} ${friendlyError.suggestion}`);
+      const errorMessage = `${friendlyError.message} ${friendlyError.suggestion}`;
+
+      // Show error toast
+      toast.error(`Failed to create poll: ${friendlyError.message}`, 5000);
+      setError(errorMessage);
     } finally {
       setIsCreating(false);
     }
@@ -372,10 +406,9 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
             // Only allow submission on the last step
             if (currentStep === totalSteps) {
               createPoll();
-            } else {
-              // On other steps, pressing Enter should advance to next step
-              nextStep();
             }
+            // Prevent any form submission on steps 1 and 2
+            // User must click the Next button explicitly
           }}>
             {/* Step Progress Indicator */}
             <div className="step-progress">
@@ -818,7 +851,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                 <button
                   type="submit"
                   className="create-poll-submit"
-                  disabled={isCreating || !isWalletConnected}
+                  disabled={isCreating || !isWalletConnected || isStepChanging}
                 >
                   {isCreating ? "Creating Poll..." : !isWalletConnected ? "Connect Wallet to Create Poll" : "Create Poll"}
                 </button>
