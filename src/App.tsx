@@ -29,6 +29,12 @@ function App() {
   const [walletName, setWalletName] = useState<string>('');
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [selectedPollId, setSelectedPollId] = useState<string>('');
+  const [statistics, setStatistics] = useState({
+    totalPolls: 0,
+    totalResponses: 0,
+    totalRewardsDistributed: 0,
+    activePolls: 0
+  });
 
   const dynamicTexts = ['business', 'surveys', 'art contests', 'debates'];
 
@@ -63,6 +69,30 @@ function App() {
     setWalletName(name);
     setIsWalletConnected(true);
   };
+
+  // Fetch statistics from contract
+  useEffect(() => {
+    const fetchStatistics = async () => {
+      try {
+        console.log('📊 App.tsx: Fetching platform statistics...');
+        console.log('📊 App.tsx: Contract address:', pollsContract.contractAddress);
+        const stats = await pollsContract.getStatistics();
+        console.log('📊 App.tsx: Raw statistics received:', stats);
+        console.log('📊 App.tsx: Statistics breakdown:');
+        console.log('  - Total Polls:', stats.totalPolls);
+        console.log('  - Total Responses:', stats.totalResponses);
+        console.log('  - Total Rewards Distributed (nanoMASSA):', stats.totalRewardsDistributed);
+        console.log('  - Total Rewards Distributed (MASSA):', stats.totalRewardsDistributed / 1e9);
+        console.log('  - Active Polls:', stats.activePolls);
+        setStatistics(stats);
+        console.log('📊 App.tsx: Statistics state updated');
+      } catch (error) {
+        console.error('📊 App.tsx: Failed to fetch statistics:', error);
+      }
+    };
+
+    fetchStatistics();
+  }, []);
 
   // Fetch featured polls from contract
   useEffect(() => {
@@ -252,6 +282,27 @@ function App() {
           <p className="hero-subtitle">Create engaging polls, contests, and surveys on the blockchain</p>
         </div>
       </header>
+
+      <section className="platform-statistics">
+        <div className="stats-container">
+          <div className="stat-box">
+            <div className="stat-number">{statistics.totalPolls.toLocaleString()}</div>
+            <div className="stat-label">Polls Created</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-number">{statistics.totalResponses.toLocaleString()}</div>
+            <div className="stat-label">Total Responses</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-number">{(statistics.totalRewardsDistributed / 1e9).toFixed(2)}</div>
+            <div className="stat-label">MASSA Distributed</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-number">{statistics.activePolls.toLocaleString()}</div>
+            <div className="stat-label">Active Polls</div>
+          </div>
+        </div>
+      </section>
 
       <section id="role-selection" className="role-selection">
         <h2>Choose Your Path</h2>
