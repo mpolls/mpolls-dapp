@@ -337,8 +337,11 @@ const ParticipantDashboard = ({ onBack, onViewPoll }: ParticipantDashboardProps)
                           </div>
                         </td>
                         <td>
-                          <span className={`status-badge ${poll.status === 'active' ? 'active' : 'ended'}`}>
-                            {poll.status === 'active' ? 'Active' : 'Ended'}
+                          <span className={`status-badge ${poll.status}`}>
+                            {poll.status === 'active' && 'Active'}
+                            {poll.status === 'closed' && 'Closed'}
+                            {poll.status === 'ended' && 'Ended'}
+                            {poll.status === 'for_claiming' && 'For Claiming'}
                           </span>
                         </td>
                         <td>

@@ -122,6 +122,18 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
     setFundAmount(amount);
   };
 
+  const handleSetForClaiming = async (pollId: string) => {
+    try {
+      await pollsContract.setForClaiming(pollId);
+      toast.success(`Poll #${pollId} is now ready for claiming rewards!`);
+      // Refresh the polls list to show updated status
+      await loadCreatorPolls();
+    } catch (err) {
+      console.error("Error setting poll to FOR_CLAIMING:", err);
+      toast.error(`Failed to set poll to FOR_CLAIMING: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
   const calculateRespondentCapacity = (pool: number, fixedReward: number): number => {
     if (fixedReward <= 0) return 0;
     return Math.floor(pool / fixedReward);
@@ -360,8 +372,11 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
                         </div>
                       </td>
                       <td>
-                        <span className={`status-badge ${poll.status === 'active' ? 'active' : 'ended'}`}>
-                          {poll.status === 'active' ? 'Active' : 'Ended'}
+                        <span className={`status-badge ${poll.status}`}>
+                          {poll.status === 'active' && 'Active'}
+                          {poll.status === 'closed' && 'Closed'}
+                          {poll.status === 'ended' && 'Ended'}
+                          {poll.status === 'for_claiming' && 'For Claiming'}
                         </span>
                       </td>
                       <td>{getFundingTypeBadge(poll.fundingType || 0)}</td>
@@ -376,13 +391,24 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
                         </div>
                       </td>
                       <td>
-                        <button
-                          className="action-btn view"
-                          onClick={() => onViewPoll && onViewPoll(parseInt(poll.id))}
-                          title="View Poll Details"
-                        >
-                          <VisibilityIcon sx={{ fontSize: 18 }} />
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            className="action-btn view"
+                            onClick={() => onViewPoll && onViewPoll(parseInt(poll.id))}
+                            title="View Poll Details"
+                          >
+                            <VisibilityIcon sx={{ fontSize: 18 }} />
+                          </button>
+                          {poll.status !== 'for_claiming' && (
+                            <button
+                              className="action-btn claiming"
+                              onClick={() => handleSetForClaiming(poll.id)}
+                              title="Enable Reward Claiming"
+                            >
+                              🎁
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

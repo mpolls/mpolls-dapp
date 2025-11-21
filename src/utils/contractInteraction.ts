@@ -50,7 +50,7 @@ export interface ContractPoll {
   votes: number[];
   createdAt: number;
   endTime: number;
-  status: 'active' | 'closed' | 'ended';
+  status: 'active' | 'closed' | 'ended' | 'for_claiming';
   projectId?: number; // Optional project assignment
   // New economics fields
   rewardPool: number; // Current reward pool in nanoMASSA
@@ -500,12 +500,14 @@ export class PollsContract {
 
       // Determine display status based on contract status and time
       // NOTE: Context.timestamp() in Massa returns MILLISECONDS, not seconds (despite what comments say)
-      // Contract status: 0=ACTIVE, 1=CLOSED (manually closed), 2=ENDED (time expired)
+      // Contract status: 0=ACTIVE, 1=CLOSED (manually closed), 2=ENDED (time expired), 3=FOR_CLAIMING (ready to claim rewards)
       const currentTimeMs = Date.now();
 
-      let displayStatus: 'active' | 'closed' | 'ended' = 'active';
+      let displayStatus: 'active' | 'closed' | 'ended' | 'for_claiming' = 'active';
       if (contractStatus === 1) {
         displayStatus = 'closed';
+      } else if (contractStatus === 3) {
+        displayStatus = 'for_claiming';
       } else if (contractStatus === 2 || currentTimeMs >= endTime) {
         displayStatus = 'ended';
       } else if (contractStatus === 0 && currentTimeMs >= startTime && currentTimeMs < endTime) {
@@ -646,11 +648,40 @@ export class PollsContract {
     }
   }
 
+  // Check voting status for multiple polls at once
+  async checkVotedPolls(pollIds: string[], voterAddress: string): Promise<Set<number>> {
+    const votedPollIds = new Set<number>();
+
+    if (!voterAddress) {
+      return votedPollIds;
+    }
+
+    console.log(`🔍 Checking voting status for ${pollIds.length} polls...`);
+
+    // Check each poll in parallel
+    const checkPromises = pollIds.map(async (pollId) => {
+      try {
+        const hasVoted = await this.hasVoted(pollId, voterAddress);
+        if (hasVoted) {
+          votedPollIds.add(parseInt(pollId));
+          console.log(`✓ Already voted on poll #${pollId}`);
+        }
+      } catch (error) {
+        console.log(`⚠️ Error checking vote status for poll ${pollId}:`, error);
+      }
+    });
+
+    await Promise.all(checkPromises);
+    console.log(`✅ Vote check complete: voted on ${votedPollIds.size} out of ${pollIds.length} polls`);
+
+    return votedPollIds;
+  }
+
   async hasVoted(pollId: string, voterAddress: string): Promise<boolean> {
     try {
       const { JsonRpcProvider } = await import("@massalabs/massa-web3");
       const provider = JsonRpcProvider.buildnet();
-      
+
       const args = new Args()
         .addString(pollId)
         .addString(voterAddress);
@@ -843,6 +874,37 @@ export class PollsContract {
     } catch (error) {
       console.error("Error closing poll:", error);
       throw new Error(`Failed to close poll: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async setForClaiming(pollId: string): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("🎁 Setting poll to FOR_CLAIMING status with parameters:", {
+        contractAddress: this.contractAddress,
+        pollId,
+        walletName: this.getWalletName(),
+        network: "Massa Buildnet"
+      });
+
+      const args = new Args().addString(pollId);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "setForClaiming",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Poll set to FOR_CLAIMING status:", result);
+      return true;
+    } catch (error) {
+      console.error("Error setting poll to FOR_CLAIMING:", error);
+      throw new Error(`Failed to set poll to FOR_CLAIMING: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

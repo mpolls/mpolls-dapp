@@ -1368,7 +1368,40 @@ html, body {
 .poll-title-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
+  width: 100%;
+}
+
+.poll-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.voted-badge {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 4px rgba(72, 187, 120, 0.3);
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .poll-title {
@@ -3146,6 +3179,28 @@ html, body {
   box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
 
+.action-btn.view {
+  background: linear-gradient(45deg, #4ECDC4, #44A08D);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  min-width: 40px;
+}
+
+.action-btn.claiming {
+  background: linear-gradient(45deg, #8B5CF6, #7C3AED);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 1.2rem;
+  min-width: 40px;
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+}
+
+.action-btn.claiming:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
+}
+
 .access-denied {
   text-align: center;
   background: rgba(255, 255, 255, 0.1);
@@ -3569,6 +3624,12 @@ html, body {
   background: rgba(255, 107, 107, 0.2);
   color: #FF6B6B;
   border: 1px solid #FF6B6B;
+}
+
+.status-badge.for_claiming {
+  background: rgba(139, 92, 246, 0.2);
+  color: #8B5CF6;
+  border: 1px solid #8B5CF6;
 }
 
 .col-actions {
