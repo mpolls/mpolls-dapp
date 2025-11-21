@@ -694,77 +694,51 @@ export class PollsContract {
     console.log('═════════════════════════════════════════════════════');
 
     try {
-      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const { JsonRpcProvider, bytesToStr } = await import("@massalabs/massa-web3");
       const provider = JsonRpcProvider.buildnet();
-      
-      // Call getAllPolls function to trigger events (using readSC for compatibility)
+
+      // Call getAllPolls function and get returned data directly
       console.log('\n📊 Fetching all polls from contract...');
-      
-      try {
-        await provider.readSC({
-          target: this.contractAddress,
-          func: 'getAllPolls',
-          parameter: new Args().serialize(),
-        });
-        console.log('✅ Successfully called getAllPolls function');
-      } catch (readError) {
-        console.log('⚠️ ReadSC getAllPolls call failed, continuing with event retrieval:', readError);
+
+      const result = await provider.readSC({
+        target: this.contractAddress,
+        func: 'getAllPolls',
+        parameter: new Args().serialize(),
+      });
+
+      console.log('✅ Successfully called getAllPolls function');
+      console.log('📦 Result structure:', result);
+
+      // Parse the returned data (polls separated by newlines)
+      // The data is in result.value, not result.returnValue
+      if (!result.value || result.value.length === 0) {
+        console.log('⚠️ No return value from getAllPolls, returning empty array');
+        return [];
       }
 
-      // Wait for events to be generated
-      console.log('⏳ Waiting for contract events...');
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // Get all events from the contract
-      const events = await provider.getEvents({
-        smartContractAddress: this.contractAddress,
-      });
-
-      console.log(`📋 Retrieved ${events.length} events from contract`);
-
-      // Filter for poll data events
-      const pollEvents = events.filter(event => {
-        const data = event.data;
-        // Look for events that contain poll data (either direct serialized data or "Poll X: data" format)
-        return data.includes('|') && (data.match(/^\d+\|/) || data.includes('Poll ') && data.includes(':'));
-      });
-
-      console.log(`🗳️ Found ${pollEvents.length} poll events`);
+      const pollsData = bytesToStr(result.value);
+      console.log('📦 Decoded polls data:', pollsData);
+      console.log(`📋 Received polls data (${pollsData.length} chars)`);
 
       const polls: ContractPoll[] = [];
-      const processedIds = new Set<string>();
 
-      // Process each poll event
-      for (const event of pollEvents) {
-        try {
-          let pollDataStr = event.data;
-          
-          // Extract data if it's in "Poll X: data" format
-          if (pollDataStr.includes('Poll ') && pollDataStr.includes(':')) {
-            const colonIndex = pollDataStr.indexOf(':');
-            pollDataStr = pollDataStr.substring(colonIndex + 1).trim();
-          }
+      if (pollsData && pollsData.trim().length > 0) {
+        const pollLines = pollsData.split('\n').filter(line => line.trim().length > 0);
+        console.log(`🗳️ Found ${pollLines.length} polls`);
 
-          console.log(`🔍 Processing poll data: "${pollDataStr.substring(0, 100)}${pollDataStr.length > 100 ? '...' : ''}"`);
+        for (const pollDataStr of pollLines) {
+          try {
+            console.log(`🔍 Processing poll data: "${pollDataStr.substring(0, 100)}${pollDataStr.length > 100 ? '...' : ''}"`);
 
-          const poll = this.parsePollData(pollDataStr);
-          if (poll) {
-            // Always update to the latest version of the poll (in case of vote updates)
-            const existingIndex = polls.findIndex(p => p.id === poll.id);
-            if (existingIndex >= 0) {
-              // Replace with newer data
-              polls[existingIndex] = poll;
-              console.log(`🔄 Updated poll #${poll.id}: "${poll.title}" with latest data`);
-            } else {
-              // Add new poll
+            const poll = this.parsePollData(pollDataStr);
+            if (poll) {
               polls.push(poll);
-              processedIds.add(poll.id);
               console.log(`✅ Successfully parsed poll #${poll.id}: "${poll.title}"`);
             }
+          } catch (parseError) {
+            console.log(`⚠️ Failed to parse poll:`, parseError);
+            continue;
           }
-        } catch (parseError) {
-          console.log(`⚠️ Failed to parse poll event:`, parseError);
-          continue;
         }
       }
 
