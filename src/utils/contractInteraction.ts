@@ -1405,6 +1405,75 @@ export class PollsContract {
     }
   }
 
+  async getStatistics(): Promise<{
+    totalPolls: number;
+    totalResponses: number;
+    totalRewardsDistributed: number;
+    activePolls: number;
+  }> {
+    try {
+      const { JsonRpcProvider, Args, bytesToStr } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      console.log("📊 contractInteraction: Fetching platform statistics...");
+      console.log("📊 contractInteraction: Target address:", this.contractAddress);
+      console.log("📊 contractInteraction: Target function: getStatistics");
+
+      const result = await provider.readSC({
+        target: this.contractAddress,
+        func: 'getStatistics',
+        parameter: new Args().serialize(),
+      });
+
+      console.log("📊 contractInteraction: Response received:", result);
+      console.log("📊 contractInteraction: Return value (raw bytes):", result.value);
+
+      if (!result.value || result.value.length === 0) {
+        console.log('⚠️ No return value from getStatistics');
+        throw new Error('No statistics data returned');
+      }
+
+      const resultString = bytesToStr(result.value);
+      console.log("📊 contractInteraction: Decoded string:", resultString);
+      console.log("📊 contractInteraction: String length:", resultString.length);
+
+      // Parse format: totalPolls|totalResponses|totalRewardsDistributed|activePolls
+      const parts = resultString.split("|");
+      console.log("📊 contractInteraction: Split parts:", parts);
+      console.log("📊 contractInteraction: Number of parts:", parts.length);
+
+      if (parts.length !== 4) {
+        console.error("📊 contractInteraction: Invalid format! Expected 4 parts, got", parts.length);
+        throw new Error("Invalid statistics format");
+      }
+
+      const stats = {
+        totalPolls: parseInt(parts[0]),
+        totalResponses: parseInt(parts[1]),
+        totalRewardsDistributed: parseInt(parts[2]),
+        activePolls: parseInt(parts[3])
+      };
+
+      console.log("📊 contractInteraction: Parsed statistics:", stats);
+      console.log("📊 contractInteraction: Individual values:");
+      console.log("  - parts[0] (totalPolls):", parts[0], "-> parsed:", stats.totalPolls);
+      console.log("  - parts[1] (totalResponses):", parts[1], "-> parsed:", stats.totalResponses);
+      console.log("  - parts[2] (totalRewardsDistributed):", parts[2], "-> parsed:", stats.totalRewardsDistributed);
+      console.log("  - parts[3] (activePolls):", parts[3], "-> parsed:", stats.activePolls);
+
+      return stats;
+    } catch (error) {
+      console.error("📊 contractInteraction: Error fetching statistics:", error);
+      console.error("📊 contractInteraction: Error details:", error instanceof Error ? error.message : String(error));
+      return {
+        totalPolls: 0,
+        totalResponses: 0,
+        totalRewardsDistributed: 0,
+        activePolls: 0
+      };
+    }
+  }
+
   // ================= PROJECT MANAGEMENT METHODS =================
 
   async createProject(params: ProjectCreationParams): Promise<string> {
