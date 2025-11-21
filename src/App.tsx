@@ -20,9 +20,7 @@ import './App.css';
 type PageType = 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap' | 'creator' | 'participant' | 'results';
 
 function App() {
-  const [currentText, setCurrentText] = useState(0);
   const [currentPage, setCurrentPage] = useState<PageType>('home');
-  const [email, setEmail] = useState('');
   const [featuredPolls, setFeaturedPolls] = useState<ContractPoll[]>([]);
   const [isLoadingPolls, setIsLoadingPolls] = useState(true);
   const [walletAddress, setWalletAddress] = useState<string>('');
@@ -35,15 +33,6 @@ function App() {
     totalRewardsDistributed: 0,
     activePolls: 0
   });
-
-  const dynamicTexts = ['business', 'surveys', 'art contests', 'debates'];
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentText((prev) => (prev + 1) % dynamicTexts.length);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [dynamicTexts.length]);
 
   // Check wallet connection on mount
   useEffect(() => {
@@ -75,7 +64,6 @@ function App() {
     const fetchStatistics = async () => {
       try {
         console.log('📊 App.tsx: Fetching platform statistics...');
-        console.log('📊 App.tsx: Contract address:', pollsContract.contractAddress);
         const stats = await pollsContract.getStatistics();
         console.log('📊 App.tsx: Raw statistics received:', stats);
         console.log('📊 App.tsx: Statistics breakdown:');
@@ -120,8 +108,6 @@ function App() {
 
     fetchFeaturedPolls();
   }, []);
-
-  const companies = ['TechCorp', 'InnovateCo', 'StartupX', 'BigBrand', 'CreativeStudio'];
 
   const handleNavigation = (page: PageType, pollId?: string) => {
     setCurrentPage(page);
@@ -272,30 +258,70 @@ function App() {
 
       <header className="hero-section">
         <div className="hero-content">
-          <div className="logo-container">
-            <MassaLogo className="dpolls-logo" size={80} />
-            <h1 className="brand-name">Massa Polls</h1>
+          <div className="hero-badge">
+            <span className="badge-icon">🔒</span>
+            Decentralized & Transparent Polling
           </div>
-          <h2 className="hero-title">
-            polls for <span className="dynamic-text">{dynamicTexts[currentText]}</span>
-          </h2>
-          <p className="hero-subtitle">Create engaging polls, contests, and surveys on the blockchain</p>
+          <h1 className="hero-title">
+            Create Polls That Matter
+          </h1>
+          <p className="hero-subtitle">
+            Build transparent, tamper-proof surveys and polls using blockchain technology.<br />
+            Get authentic responses with complete data integrity and user privacy protection.
+          </p>
+          <div className="hero-cta">
+            <button className="cta-primary" onClick={() => handleNavigation('create')}>
+              Get Started
+            </button>
+            <button className="cta-secondary" onClick={() => handleNavigation('polls')}>
+              Browse Polls
+            </button>
+          </div>
+          <div className="hero-features">
+            <div className="feature-item">
+              <span className="feature-icon">✓</span> No registration required
+            </div>
+            <div className="feature-item">
+              <span className="feature-icon">✓</span> Tamper-proof results
+            </div>
+            <div className="feature-item">
+              <span className="feature-icon">✓</span> Real-time analytics
+            </div>
+          </div>
         </div>
       </header>
 
       <section className="platform-statistics">
         <div className="stats-container">
           <div className="stat-box">
-            <div className="stat-number">{statistics.totalPolls.toLocaleString()}</div>
-            <div className="stat-label">Polls Created</div>
+            <div className="stat-icon-wrapper" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}}>
+              <HowToVoteIcon sx={{ fontSize: 28, color: 'white' }} />
+            </div>
+            <div className="stat-content">
+              <div className="stat-number">{statistics.totalPolls.toLocaleString()}</div>
+              <div className="stat-label">Polls Created</div>
+              <div className="stat-subtitle">Active community engagement</div>
+            </div>
           </div>
           <div className="stat-box">
-            <div className="stat-number">{statistics.totalResponses.toLocaleString()}</div>
-            <div className="stat-label">Total Responses</div>
+            <div className="stat-icon-wrapper" style={{background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'}}>
+              <TableChartIcon sx={{ fontSize: 28, color: 'white' }} />
+            </div>
+            <div className="stat-content">
+              <div className="stat-number">{statistics.totalResponses.toLocaleString()}</div>
+              <div className="stat-label">Total Responses</div>
+              <div className="stat-subtitle">Community contributed</div>
+            </div>
           </div>
           <div className="stat-box">
-            <div className="stat-number">{(statistics.totalRewardsDistributed / 1e9).toFixed(2)}</div>
-            <div className="stat-label">MASSA Distributed</div>
+            <div className="stat-icon-wrapper" style={{background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'}}>
+              <span style={{fontSize: '28px', color: 'white'}}>💰</span>
+            </div>
+            <div className="stat-content">
+              <div className="stat-number">{(statistics.totalRewardsDistributed / 1e9).toFixed(2)} MASSA</div>
+              <div className="stat-label">Funds Delivered</div>
+              <div className="stat-subtitle">Rewards distributed</div>
+            </div>
           </div>
         </div>
       </section>
@@ -374,71 +400,71 @@ function App() {
         </button>
       </section>
 
-      <section className="used-by">
-        <h2>As Used By</h2>
-        <div className="company-logos">
-          {companies.map(company => (
-            <div key={company} className="company-logo">
-              {company}
-            </div>
-          ))}
-        </div>
-      </section>
-
       <section id="why-create" className="why-create">
-        <h2>Why Create Polls with Massa Polls?</h2>
+        <h2>Why Choose Massa Polls?</h2>
+        <p className="section-subtitle">Experience the future of polling with blockchain-powered transparency and security</p>
         <div className="benefits">
           <div className="benefit">
-            <h3>Make a contest, make money</h3>
-            <p>We split all charges 70 (you) / 30 (us)</p>
+            <div className="benefit-icon" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}}>
+              <span style={{fontSize: '28px'}}>🔒</span>
+            </div>
+            <h3>Tamper-Proof Results</h3>
+            <p>Every vote is recorded on the blockchain, ensuring complete transparency and preventing any manipulation of results.</p>
           </div>
           <div className="benefit">
-            <h3>Flexible voting options</h3>
-            <p>Let anyone vote—or allowlist. The choice is yours, and it's anti-bot.</p>
+            <div className="benefit-icon" style={{background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'}}>
+              <span style={{fontSize: '28px'}}>🎭</span>
+            </div>
+            <h3>Anonymous & Private</h3>
+            <p>Protect respondent privacy with zero-knowledge proofs while maintaining vote authenticity and preventing duplicates.</p>
           </div>
           <div className="benefit">
-            <h3>Create rewards pool</h3>
-            <p>Create a rewards pool for winners</p>
+            <div className="benefit-icon" style={{background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'}}>
+              <span style={{fontSize: '28px'}}>⚡</span>
+            </div>
+            <h3>Instant Results</h3>
+            <p>Get real-time analytics and results as votes come in, with automatic verification and transparent counting.</p>
           </div>
-          <div className="benefit">
-            <h3>Keep or reinvest</h3>
-            <p>Keep the money you earn, or put it back into rewards pool</p>
-          </div>
-          <div className="benefit">
-            <h3>Onchain rewards</h3>
-            <p>Give players rewards, points, credentials—all data is onchain</p>
-          </div>
-        </div>
-        
-        <div className="email-signup">
-          <input
-            type="email"
-            placeholder="Enter your email address"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="email-input"
-          />
-          <button className="signup-btn">Get Started</button>
         </div>
       </section>
 
       <section id="how-it-works" className="how-it-works">
         <h2>How It Works</h2>
-        <div className="process">
-          <h3>To create a contest:</h3>
-          <ul>
-            <li>Pick your contest type: who can enter? who can vote?</li>
-            <li>Pick a gallery view or text view</li>
-            <li>Set duration for entry and voting periods</li>
-            <li>Set charges for entering and voting</li>
-            <li>Bonus: add a rewards pool. Fund it yourself—or with money you earn from the contest.</li>
-            <li>And it's free. You just pay the cost to deploy (often just cents).</li>
-          </ul>
+        <p className="section-subtitle">Create and deploy your poll in minutes with our simple three-step process</p>
+        <div className="process-steps">
+          <div className="process-step">
+            <div className="step-number">1</div>
+            <h3>Create Your Poll</h3>
+            <p>Enter your question and customize your poll options. Choose from multiple question types and design templates.</p>
+          </div>
+          <div className="process-step">
+            <div className="step-number">2</div>
+            <h3>Deploy on Blockchain</h3>
+            <p>Your poll is automatically deployed on the blockchain, creating an immutable and transparent voting system.</p>
+          </div>
+          <div className="process-step">
+            <div className="step-number">3</div>
+            <h3>Share & Collect</h3>
+            <p>Share your poll link and watch real-time results come in. All votes are verified and counted transparently.</p>
+          </div>
         </div>
-        
-        <button className="final-cta-btn" onClick={() => handleNavigation('polls')}>
-          View Polls
-        </button>
+      </section>
+
+      <section className="final-cta">
+        <div className="final-cta-content">
+          <h2>Ready to Create Your First Poll?</h2>
+          <p>Join thousands using Massa Polls for transparent, secure polling</p>
+          <div className="cta-buttons">
+            <button className="cta-primary-large" onClick={() => handleNavigation('create')}>
+              Start Polling
+            </button>
+          </div>
+          <div className="cta-features">
+            <span>✓ No credit card required</span>
+            <span>✓ Deploy in seconds</span>
+            <span>✓ Blockchain verified</span>
+          </div>
+        </div>
       </section>
     </div>
     </ToastProvider>
