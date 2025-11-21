@@ -82,9 +82,9 @@ const ParticipantDashboard = ({ onBack, onViewPoll }: ParticipantDashboardProps)
               estimatedReward = (poll.fixedRewardAmount || 0) / 1e9;
             }
 
-            // Can claim if: poll ended, not active, has MANUAL_PULL distribution, has reward pool, hasn't claimed
+            // Can claim if: poll is FOR_CLAIMING, has MANUAL_PULL distribution, has reward pool, hasn't claimed
             const canClaimReward =
-              poll.status !== 'active' &&
+              poll.status === 'for_claiming' &&
               poll.distributionType === 0 &&
               poolInMassa > 0 &&
               !hasClaimedReward &&
@@ -337,8 +337,11 @@ const ParticipantDashboard = ({ onBack, onViewPoll }: ParticipantDashboardProps)
                           </div>
                         </td>
                         <td>
-                          <span className={`status-badge ${poll.status === 'active' ? 'active' : 'ended'}`}>
-                            {poll.status === 'active' ? 'Active' : 'Ended'}
+                          <span className={`status-badge ${poll.status}`}>
+                            {poll.status === 'active' && 'Active'}
+                            {poll.status === 'closed' && 'Closed'}
+                            {poll.status === 'ended' && 'Ended'}
+                            {poll.status === 'for_claiming' && 'For Claiming'}
                           </span>
                         </td>
                         <td>

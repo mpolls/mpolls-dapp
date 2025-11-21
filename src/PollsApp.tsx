@@ -227,28 +227,17 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
   const checkVotingStatus = async (polls: Poll[]) => {
     try {
       const walletAddress = await pollsContract.getWalletAddress();
-      if (!walletAddress) return;
-      
-      console.log(`🔍 Checking voting status for ${polls.length} polls...`);
-      const voted = new Set<number>();
-      
-      // Check voting status for each poll
-      for (const poll of polls) {
-        try {
-          const hasVoted = await pollsContract.hasVoted(poll.id.toString(), walletAddress);
-          if (hasVoted) {
-            voted.add(poll.id);
-            console.log(`✅ User has voted on poll ${poll.id}: "${poll.title}"`);
-          } else {
-            console.log(`⭕ User has not voted on poll ${poll.id}: "${poll.title}"`);
-          }
-        } catch (error) {
-          console.log(`⚠️ Failed to check voting status for poll ${poll.id}:`, error);
-        }
+      if (!walletAddress) {
+        console.log('⚠️ No wallet connected, skipping vote status check');
+        return;
       }
-      
-      setVotedPolls(voted);
-      console.log(`📊 Voting status check complete. Voted on ${voted.size} out of ${polls.length} polls.`);
+
+      // Use the optimized parallel checking method
+      const pollIds = polls.map(p => p.id.toString());
+      const votedPollIds = await pollsContract.checkVotedPolls(pollIds, walletAddress);
+
+      setVotedPolls(votedPollIds);
+      console.log(`📊 Voting status updated: voted on ${votedPollIds.size} out of ${polls.length} polls`);
     } catch (error) {
       console.error("❌ Failed to check voting status:", error);
     }
@@ -754,7 +743,12 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                               <div className="poll-info">
                                 <div className="poll-title-row">
                                   <span className="poll-title">{poll.title}</span>
-                                  <span className="poll-id">#{poll.id}</span>
+                                  <div className="poll-badges">
+                                    {votedPolls.has(poll.id) && (
+                                      <span className="voted-badge">✓ Voted</span>
+                                    )}
+                                    <span className="poll-id">#{poll.id}</span>
+                                  </div>
                                 </div>
                                 <span className="poll-description">
                                   {poll.description.length > 60
@@ -770,6 +764,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
                               {poll.status === 'active' && '🟢 Active'}
                               {poll.status === 'closed' && '🔴 Closed'}
                               {poll.status === 'ended' && '⏸️ Ended'}
+                              {poll.status === 'for_claiming' && '🎁 For Claiming'}
                             </span>
                           </td>
                           <td className="td-votes">

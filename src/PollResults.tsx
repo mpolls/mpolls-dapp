@@ -121,7 +121,10 @@ const PollResults: React.FC<PollResultsProps> = ({ pollId, onBack }) => {
           <p className="poll-description">{poll.description}</p>
           <div className="poll-meta">
             <span className={`status-badge ${poll.status}`}>
-              {poll.status === 'active' ? '🟢 Active' : poll.status === 'closed' ? '🔴 Closed' : '⚫ Ended'}
+              {poll.status === 'active' && '🟢 Active'}
+              {poll.status === 'closed' && '🔴 Closed'}
+              {poll.status === 'ended' && '⏸️ Ended'}
+              {poll.status === 'for_claiming' && '🎁 For Claiming'}
             </span>
             <span className="total-votes">{totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}</span>
           </div>

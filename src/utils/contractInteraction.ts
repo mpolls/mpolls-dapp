@@ -50,7 +50,7 @@ export interface ContractPoll {
   votes: number[];
   createdAt: number;
   endTime: number;
-  status: 'active' | 'closed' | 'ended';
+  status: 'active' | 'closed' | 'ended' | 'for_claiming';
   projectId?: number; // Optional project assignment
   // New economics fields
   rewardPool: number; // Current reward pool in nanoMASSA
@@ -500,12 +500,14 @@ export class PollsContract {
 
       // Determine display status based on contract status and time
       // NOTE: Context.timestamp() in Massa returns MILLISECONDS, not seconds (despite what comments say)
-      // Contract status: 0=ACTIVE, 1=CLOSED (manually closed), 2=ENDED (time expired)
+      // Contract status: 0=ACTIVE, 1=CLOSED (manually closed), 2=ENDED (time expired), 3=FOR_CLAIMING (ready to claim rewards)
       const currentTimeMs = Date.now();
 
-      let displayStatus: 'active' | 'closed' | 'ended' = 'active';
+      let displayStatus: 'active' | 'closed' | 'ended' | 'for_claiming' = 'active';
       if (contractStatus === 1) {
         displayStatus = 'closed';
+      } else if (contractStatus === 3) {
+        displayStatus = 'for_claiming';
       } else if (contractStatus === 2 || currentTimeMs >= endTime) {
         displayStatus = 'ended';
       } else if (contractStatus === 0 && currentTimeMs >= startTime && currentTimeMs < endTime) {
@@ -646,35 +648,55 @@ export class PollsContract {
     }
   }
 
+  // Check voting status for multiple polls at once
+  async checkVotedPolls(pollIds: string[], voterAddress: string): Promise<Set<number>> {
+    const votedPollIds = new Set<number>();
+
+    if (!voterAddress) {
+      return votedPollIds;
+    }
+
+    console.log(`🔍 Checking voting status for ${pollIds.length} polls...`);
+
+    // Check each poll in parallel
+    const checkPromises = pollIds.map(async (pollId) => {
+      try {
+        const hasVoted = await this.hasVoted(pollId, voterAddress);
+        if (hasVoted) {
+          votedPollIds.add(parseInt(pollId));
+          console.log(`✓ Already voted on poll #${pollId}`);
+        }
+      } catch (error) {
+        console.log(`⚠️ Error checking vote status for poll ${pollId}:`, error);
+      }
+    });
+
+    await Promise.all(checkPromises);
+    console.log(`✅ Vote check complete: voted on ${votedPollIds.size} out of ${pollIds.length} polls`);
+
+    return votedPollIds;
+  }
+
   async hasVoted(pollId: string, voterAddress: string): Promise<boolean> {
     try {
-      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const { JsonRpcProvider, bytesToStr } = await import("@massalabs/massa-web3");
       const provider = JsonRpcProvider.buildnet();
-      
+
       const args = new Args()
         .addString(pollId)
         .addString(voterAddress);
 
       // Call the contract function to check if user has voted
-      await provider.readSC({
+      const result = await provider.readSC({
         target: this.contractAddress,
         func: "hasVoted",
         parameter: args.serialize(),
       });
 
-      // Get events to find the hasVoted result
-      const events = await provider.getEvents({
-        smartContractAddress: this.contractAddress,
-      });
-
-      // Look for the hasVoted result event
-      const hasVotedEvents = events.filter(event => 
-        event.data.includes(`has voted on poll ${pollId}:`)
-      );
-
-      if (hasVotedEvents.length > 0) {
-        const latestEvent = hasVotedEvents[hasVotedEvents.length - 1];
-        return latestEvent.data.includes('true');
+      // The contract now returns "true" or "false" directly
+      if (result.value && result.value.length > 0) {
+        const resultStr = bytesToStr(result.value);
+        return resultStr === "true";
       }
 
       return false;
@@ -843,6 +865,37 @@ export class PollsContract {
     } catch (error) {
       console.error("Error closing poll:", error);
       throw new Error(`Failed to close poll: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async setForClaiming(pollId: string): Promise<boolean> {
+    if (!this.account) {
+      throw new Error("Wallet not connected. Please connect your wallet first.");
+    }
+
+    try {
+      console.log("🎁 Setting poll to FOR_CLAIMING status with parameters:", {
+        contractAddress: this.contractAddress,
+        pollId,
+        walletName: this.getWalletName(),
+        network: "Massa Buildnet"
+      });
+
+      const args = new Args().addString(pollId);
+
+      const result = await this.account.callSC({
+        target: this.contractAddress,
+        func: "setForClaiming",
+        parameter: args.serialize(),
+        coins: 0n,
+        fee: Mas.fromString('0.01'),
+      });
+
+      console.log("✅ Poll set to FOR_CLAIMING status:", result);
+      return true;
+    } catch (error) {
+      console.error("Error setting poll to FOR_CLAIMING:", error);
+      throw new Error(`Failed to set poll to FOR_CLAIMING: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -1249,37 +1302,106 @@ export class PollsContract {
 
   async hasClaimed(pollId: string, voterAddress: string): Promise<boolean> {
     try {
-      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const { JsonRpcProvider, bytesToStr } = await import("@massalabs/massa-web3");
       const provider = JsonRpcProvider.buildnet();
 
       const args = new Args()
         .addString(pollId)
         .addString(voterAddress);
 
-      await provider.readSC({
+      const result = await provider.readSC({
         target: this.contractAddress,
         func: "hasClaimed",
         parameter: args.serialize(),
       });
 
-      // Get events to check claimed status
-      const events = await provider.getEvents({
-        smartContractAddress: this.contractAddress,
-      });
-
-      const claimedEvents = events.filter(event =>
-        event.data.includes(`Voter ${voterAddress} has claimed reward for poll ${pollId}:`)
-      );
-
-      if (claimedEvents.length > 0) {
-        const latestEvent = claimedEvents[claimedEvents.length - 1];
-        return latestEvent.data.includes(": true");
+      // The contract now returns "true" or "false" directly
+      if (result.value && result.value.length > 0) {
+        const resultStr = bytesToStr(result.value);
+        return resultStr === "true";
       }
 
       return false;
     } catch (error) {
       console.error("Error checking claimed status:", error);
       return false;
+    }
+  }
+
+  async getPollVotersAndClaims(pollId: string): Promise<{
+    voters: Array<{ address: string; option: number; hasClaimed: boolean; claimAmount?: number }>;
+    totalVotes: number;
+    totalClaimed: number;
+  }> {
+    try {
+      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const provider = JsonRpcProvider.buildnet();
+
+      console.log(`🔍 Fetching voters and claims for poll #${pollId}...`);
+
+      // Get all events from the contract
+      const events = await provider.getEvents({
+        smartContractAddress: this.contractAddress,
+      });
+
+      console.log(`📋 Total events found: ${events.length}`);
+
+      // Parse vote events for this poll
+      const votePattern = new RegExp(`Vote cast by (AU[A-Za-z0-9]+) for option (\\d+) in poll ${pollId}`);
+      const claimPattern = new RegExp(`Reward claimed: (\\d+) nanoMASSA by (AU[A-Za-z0-9]+) from poll ${pollId}`);
+
+      const votersMap = new Map<string, { address: string; option: number; hasClaimed: boolean; claimAmount?: number }>();
+
+      // First, collect all voters from vote events
+      for (const event of events) {
+        const voteMatch = event.data.match(votePattern);
+        if (voteMatch) {
+          const voterAddress = voteMatch[1];
+          const optionIndex = parseInt(voteMatch[2]);
+
+          if (!votersMap.has(voterAddress)) {
+            votersMap.set(voterAddress, {
+              address: voterAddress,
+              option: optionIndex,
+              hasClaimed: false
+            });
+          }
+        }
+      }
+
+      // Then, mark voters who have claimed
+      let totalClaimed = 0;
+      for (const event of events) {
+        const claimMatch = event.data.match(claimPattern);
+        if (claimMatch) {
+          const claimAmount = parseInt(claimMatch[1]);
+          const voterAddress = claimMatch[2];
+
+          const voter = votersMap.get(voterAddress);
+          if (voter) {
+            voter.hasClaimed = true;
+            voter.claimAmount = claimAmount;
+            totalClaimed++;
+          }
+        }
+      }
+
+      const voters = Array.from(votersMap.values());
+
+      console.log(`✅ Found ${voters.length} voters, ${totalClaimed} have claimed rewards`);
+
+      return {
+        voters,
+        totalVotes: voters.length,
+        totalClaimed
+      };
+    } catch (error) {
+      console.error("Error fetching poll voters and claims:", error);
+      return {
+        voters: [],
+        totalVotes: 0,
+        totalClaimed: 0
+      };
     }
   }
 

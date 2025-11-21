@@ -8,6 +8,7 @@ import WarningIcon from '@mui/icons-material/Warning';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import AssignmentIcon from '@mui/icons-material/Assignment';
 
 interface CreatorDashboardProps {
   onBack: () => void;
@@ -24,6 +25,9 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
   const [selectedPolls, setSelectedPolls] = useState<Set<string>>(new Set());
   const [fundAmount, setFundAmount] = useState<number>(0);
   const [isFunding, setIsFunding] = useState(false);
+  const [showClaimingModal, setShowClaimingModal] = useState(false);
+  const [selectedPollForClaiming, setSelectedPollForClaiming] = useState<ContractPoll | null>(null);
+  const [claimingData, setClaimingData] = useState<any[]>([]);
 
   useEffect(() => {
     loadCreatorPolls();
@@ -120,6 +124,39 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
 
   const handleQuickFund = (amount: number) => {
     setFundAmount(amount);
+  };
+
+  const handleSetForClaiming = async (pollId: string) => {
+    try {
+      await pollsContract.setForClaiming(pollId);
+      toast.success(`Poll #${pollId} is now ready for claiming rewards!`);
+      // Refresh the polls list to show updated status
+      await loadCreatorPolls();
+    } catch (err) {
+      console.error("Error setting poll to FOR_CLAIMING:", err);
+      toast.error(`Failed to set poll to FOR_CLAIMING: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleViewClaimingStatus = async (poll: ContractPoll) => {
+    setSelectedPollForClaiming(poll);
+    setShowClaimingModal(true);
+
+    // Load claiming data from events
+    try {
+      const votersData = await pollsContract.getPollVotersAndClaims(poll.id);
+      setClaimingData(votersData.voters);
+
+      if (votersData.voters.length > 0) {
+        toast.success(`Loaded ${votersData.voters.length} voters, ${votersData.totalClaimed} claimed`);
+      } else {
+        toast.info("No voters found for this poll yet");
+      }
+    } catch (err) {
+      console.error("Error loading claiming status:", err);
+      toast.error("Failed to load claiming status");
+      setClaimingData([]);
+    }
   };
 
   const calculateRespondentCapacity = (pool: number, fixedReward: number): number => {
@@ -360,8 +397,11 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
                         </div>
                       </td>
                       <td>
-                        <span className={`status-badge ${poll.status === 'active' ? 'active' : 'ended'}`}>
-                          {poll.status === 'active' ? 'Active' : 'Ended'}
+                        <span className={`status-badge ${poll.status}`}>
+                          {poll.status === 'active' && 'Active'}
+                          {poll.status === 'closed' && 'Closed'}
+                          {poll.status === 'ended' && 'Ended'}
+                          {poll.status === 'for_claiming' && 'For Claiming'}
                         </span>
                       </td>
                       <td>{getFundingTypeBadge(poll.fundingType || 0)}</td>
@@ -376,13 +416,31 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
                         </div>
                       </td>
                       <td>
-                        <button
-                          className="action-btn view"
-                          onClick={() => onViewPoll && onViewPoll(parseInt(poll.id))}
-                          title="View Poll Details"
-                        >
-                          <VisibilityIcon sx={{ fontSize: 18 }} />
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            className="action-btn view"
+                            onClick={() => onViewPoll && onViewPoll(parseInt(poll.id))}
+                            title="View Poll Details"
+                          >
+                            <VisibilityIcon sx={{ fontSize: 18 }} />
+                          </button>
+                          {poll.status !== 'for_claiming' && (
+                            <button
+                              className="action-btn claiming"
+                              onClick={() => handleSetForClaiming(poll.id)}
+                              title="Enable Reward Claiming"
+                            >
+                              🎁
+                            </button>
+                          )}
+                          <button
+                            className="action-btn claims-status"
+                            onClick={() => handleViewClaimingStatus(poll)}
+                            title="View Claiming Status"
+                          >
+                            <AssignmentIcon sx={{ fontSize: 18 }} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -392,6 +450,132 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
           </div>
         )}
       </div>
+
+      {/* Claiming Status Modal */}
+      {showClaimingModal && selectedPollForClaiming && (
+        <div className="modal-overlay" onClick={() => setShowClaimingModal(false)}>
+          <div className="modal-content claiming-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>
+                <AssignmentIcon sx={{ fontSize: 28, marginRight: 1, verticalAlign: 'middle' }} />
+                Claiming Status: {selectedPollForClaiming.title}
+              </h2>
+              <button className="modal-close" onClick={() => setShowClaimingModal(false)}>
+                ✕
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div className="claiming-stats">
+                <div className="stat-box">
+                  <span className="stat-label">Poll ID</span>
+                  <span className="stat-value">#{selectedPollForClaiming.id}</span>
+                </div>
+                <div className="stat-box">
+                  <span className="stat-label">Status</span>
+                  <span className={`status-badge ${selectedPollForClaiming.status}`}>
+                    {selectedPollForClaiming.status === 'active' && 'Active'}
+                    {selectedPollForClaiming.status === 'closed' && 'Closed'}
+                    {selectedPollForClaiming.status === 'ended' && 'Ended'}
+                    {selectedPollForClaiming.status === 'for_claiming' && 'For Claiming'}
+                  </span>
+                </div>
+                <div className="stat-box">
+                  <span className="stat-label">Reward Pool</span>
+                  <span className="stat-value">{((selectedPollForClaiming.rewardPool || 0) / 1e9).toFixed(4)} MASSA</span>
+                </div>
+                <div className="stat-box">
+                  <span className="stat-label">Total Votes</span>
+                  <span className="stat-value">
+                    {selectedPollForClaiming.votes.reduce((sum, v) => sum + v, 0)}
+                  </span>
+                </div>
+              </div>
+
+              {claimingData.length > 0 ? (
+                <div className="voters-list">
+                  <h3>Voters & Claiming Status</h3>
+                  <table className="voters-table">
+                    <thead>
+                      <tr>
+                        <th>Voter Address</th>
+                        <th>Option Voted</th>
+                        <th>Claim Status</th>
+                        <th>Claimed Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {claimingData.map((voter, idx) => (
+                        <tr key={idx}>
+                          <td>
+                            <code className="address-code">
+                              {voter.address.substring(0, 10)}...{voter.address.substring(voter.address.length - 8)}
+                            </code>
+                          </td>
+                          <td>{selectedPollForClaiming.options[voter.option] || `Option ${voter.option}`}</td>
+                          <td>
+                            {voter.hasClaimed ? (
+                              <span className="claim-status claimed">✓ Claimed</span>
+                            ) : (
+                              <span className="claim-status pending">⏳ Pending</span>
+                            )}
+                          </td>
+                          <td>
+                            {voter.hasClaimed && voter.claimAmount
+                              ? `${(voter.claimAmount / 1e9).toFixed(4)} MASSA`
+                              : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="claiming-info-message">
+                  <p>
+                    <strong>No voters yet.</strong> Once users vote on this poll, their information will appear here.
+                  </p>
+                  <p>
+                    Voter data is retrieved from blockchain events, showing who voted and who has claimed rewards.
+                  </p>
+                </div>
+              )}
+
+              <div className="votes-breakdown">
+                <h3>Votes by Option</h3>
+                <table className="votes-table">
+                  <thead>
+                    <tr>
+                      <th>Option</th>
+                      <th>Votes</th>
+                      <th>Percentage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedPollForClaiming.options.map((option, idx) => {
+                      const totalVotes = selectedPollForClaiming.votes.reduce((sum, v) => sum + v, 0);
+                      const percentage = totalVotes > 0 ? (selectedPollForClaiming.votes[idx] / totalVotes * 100).toFixed(1) : '0';
+                      return (
+                        <tr key={idx}>
+                          <td>{option}</td>
+                          <td>{selectedPollForClaiming.votes[idx]}</td>
+                          <td>{percentage}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowClaimingModal(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
