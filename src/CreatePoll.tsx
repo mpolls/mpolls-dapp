@@ -821,13 +821,13 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                           checked={formData.distributionType === "autonomous"}
                           onChange={(e) => setFormData(prev => ({ ...prev, distributionType: e.target.value as "manual-pull" | "manual-push" | "autonomous" }))}
                         />
-                        <span>Autonomous</span>
+                        <span>Auto-Distribute</span>
                       </label>
                     </div>
                     <small>
                       {formData.distributionType === "manual-pull" && "Respondents claim their rewards after poll ends"}
                       {formData.distributionType === "manual-push" && "You trigger reward distribution to all respondents"}
-                      {formData.distributionType === "autonomous" && "Automatic distribution by smart contract when poll ends"}
+                      {formData.distributionType === "autonomous" && "Automatic distribution by smart contract at scheduled time after poll closes"}
                     </small>
                   </div>
                 </div>
