@@ -297,10 +297,6 @@ function App() {
             <div className="stat-number">{(statistics.totalRewardsDistributed / 1e9).toFixed(2)}</div>
             <div className="stat-label">MASSA Distributed</div>
           </div>
-          <div className="stat-box">
-            <div className="stat-number">{statistics.activePolls.toLocaleString()}</div>
-            <div className="stat-label">Active Polls</div>
-          </div>
         </div>
       </section>
 
