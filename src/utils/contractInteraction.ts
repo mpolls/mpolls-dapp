@@ -679,7 +679,7 @@ export class PollsContract {
 
   async hasVoted(pollId: string, voterAddress: string): Promise<boolean> {
     try {
-      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const { JsonRpcProvider, bytesToStr } = await import("@massalabs/massa-web3");
       const provider = JsonRpcProvider.buildnet();
 
       const args = new Args()
@@ -687,25 +687,16 @@ export class PollsContract {
         .addString(voterAddress);
 
       // Call the contract function to check if user has voted
-      await provider.readSC({
+      const result = await provider.readSC({
         target: this.contractAddress,
         func: "hasVoted",
         parameter: args.serialize(),
       });
 
-      // Get events to find the hasVoted result
-      const events = await provider.getEvents({
-        smartContractAddress: this.contractAddress,
-      });
-
-      // Look for the hasVoted result event
-      const hasVotedEvents = events.filter(event => 
-        event.data.includes(`has voted on poll ${pollId}:`)
-      );
-
-      if (hasVotedEvents.length > 0) {
-        const latestEvent = hasVotedEvents[hasVotedEvents.length - 1];
-        return latestEvent.data.includes('true');
+      // The contract now returns "true" or "false" directly
+      if (result.value && result.value.length > 0) {
+        const resultStr = bytesToStr(result.value);
+        return resultStr === "true";
       }
 
       return false;
@@ -1311,31 +1302,23 @@ export class PollsContract {
 
   async hasClaimed(pollId: string, voterAddress: string): Promise<boolean> {
     try {
-      const { JsonRpcProvider } = await import("@massalabs/massa-web3");
+      const { JsonRpcProvider, bytesToStr } = await import("@massalabs/massa-web3");
       const provider = JsonRpcProvider.buildnet();
 
       const args = new Args()
         .addString(pollId)
         .addString(voterAddress);
 
-      await provider.readSC({
+      const result = await provider.readSC({
         target: this.contractAddress,
         func: "hasClaimed",
         parameter: args.serialize(),
       });
 
-      // Get events to check claimed status
-      const events = await provider.getEvents({
-        smartContractAddress: this.contractAddress,
-      });
-
-      const claimedEvents = events.filter(event =>
-        event.data.includes(`Voter ${voterAddress} has claimed reward for poll ${pollId}:`)
-      );
-
-      if (claimedEvents.length > 0) {
-        const latestEvent = claimedEvents[claimedEvents.length - 1];
-        return latestEvent.data.includes(": true");
+      // The contract now returns "true" or "false" directly
+      if (result.value && result.value.length > 0) {
+        const resultStr = bytesToStr(result.value);
+        return resultStr === "true";
       }
 
       return false;
