@@ -3215,6 +3215,20 @@ html, body {
   box-shadow: 0 6px 20px rgba(245, 158, 11, 0.5);
 }
 
+.action-btn.close-poll {
+  background: linear-gradient(45deg, #EF4444, #DC2626);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  min-width: 40px;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+}
+
+.action-btn.close-poll:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5);
+}
+
 .claiming-modal {
   max-width: 800px;
   width: 90%;

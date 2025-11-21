@@ -9,6 +9,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import BlockIcon from '@mui/icons-material/Block';
 
 interface CreatorDashboardProps {
   onBack: () => void;
@@ -130,11 +131,43 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
     try {
       await pollsContract.setForClaiming(pollId);
       toast.success(`Poll #${pollId} is now ready for claiming rewards!`);
-      // Refresh the polls list to show updated status
-      await loadCreatorPolls();
+
+      // Wait for blockchain confirmation before refreshing
+      setTimeout(() => {
+        toast.info('Status updated! Refreshing polls list...', 2000);
+
+        // Wait a bit more before refresh to ensure status change is reflected
+        setTimeout(async () => {
+          await loadCreatorPolls();
+        }, 2000); // Additional 2 seconds
+      }, 3000); // Initial 3 second wait for transaction confirmation
     } catch (err) {
       console.error("Error setting poll to FOR_CLAIMING:", err);
       toast.error(`Failed to set poll to FOR_CLAIMING: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleClosePoll = async (pollId: string) => {
+    if (!confirm("Are you sure you want to close this poll? This will stop accepting votes.")) {
+      return;
+    }
+
+    try {
+      await pollsContract.closePoll(pollId);
+      toast.success(`Poll #${pollId} has been closed successfully!`);
+
+      // Wait for blockchain confirmation before refreshing
+      setTimeout(() => {
+        toast.info('Poll closed! Refreshing polls list...', 2000);
+
+        // Wait a bit more before refresh to ensure status change is reflected
+        setTimeout(async () => {
+          await loadCreatorPolls();
+        }, 2000); // Additional 2 seconds
+      }, 3000); // Initial 3 second wait for transaction confirmation
+    } catch (err) {
+      console.error("Error closing poll:", err);
+      toast.error(`Failed to close poll: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
@@ -416,7 +449,7 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
                         </div>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           <button
                             className="action-btn view"
                             onClick={() => onViewPoll && onViewPoll(parseInt(poll.id))}
@@ -424,7 +457,16 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
                           >
                             <VisibilityIcon sx={{ fontSize: 18 }} />
                           </button>
-                          {poll.status !== 'for_claiming' && (
+                          {poll.status === 'active' && (
+                            <button
+                              className="action-btn close-poll"
+                              onClick={() => handleClosePoll(poll.id)}
+                              title="Close Poll (Stop Voting)"
+                            >
+                              <BlockIcon sx={{ fontSize: 18 }} />
+                            </button>
+                          )}
+                          {(poll.status === 'closed' || poll.status === 'ended') && (
                             <button
                               className="action-btn claiming"
                               onClick={() => handleSetForClaiming(poll.id)}
