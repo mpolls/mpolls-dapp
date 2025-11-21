@@ -71,7 +71,7 @@ function App() {
         const contractPolls = await pollsContract.getAllPolls();
 
         // Filter only active polls that users can vote on
-        const activePolls = contractPolls.filter(poll => poll.isActive);
+        const activePolls = contractPolls.filter(poll => poll.status === 'active');
 
         // Take the first 8 active polls for featured section (or all if less than 8)
         const featured = activePolls.slice(0, 8);
@@ -282,7 +282,7 @@ function App() {
           <div className="polls-grid">
             {featuredPolls.map(poll => {
               const totalVotes = poll.votes.reduce((sum, votes) => sum + votes, 0);
-              const timeLeft = poll.isActive ? 'Active' : 'Ended';
+              const timeLeft = poll.status === 'active' ? 'Active' : 'Ended';
               
               return (
                 <div key={poll.id} className="poll-card">

@@ -82,10 +82,9 @@ const AdminPage = ({ onBack }: AdminPageProps) => {
           options: contractPoll.options,
           votes: contractPoll.votes,
           totalVotes,
-          timeLeft: contractPoll.isActive ? "Active" : "Ended",
+          timeLeft: contractPoll.status === 'active' ? "Active" : "Ended",
           creator: contractPoll.creator,
           rewards: "0 MASSA",
-          isActive: contractPoll.isActive,
           createdAt: contractPoll.createdAt,
           endTime: contractPoll.endTime,
           status: contractPoll.status,
@@ -594,10 +593,10 @@ const AdminPage = ({ onBack }: AdminPageProps) => {
                         <strong>Total Polls:</strong> {polls.length}
                       </div>
                       <div className="stat-item">
-                        <strong>Active:</strong> {polls.filter(p => p.isActive).length}
+                        <strong>Active:</strong> {polls.filter(p => p.status === 'active').length}
                       </div>
                       <div className="stat-item">
-                        <strong>Ended:</strong> {polls.filter(p => !p.isActive).length}
+                        <strong>Ended:</strong> {polls.filter(p => p.status !== 'active').length}
                       </div>
                     </div>
 
@@ -641,7 +640,7 @@ const AdminPage = ({ onBack }: AdminPageProps) => {
                             <button 
                               className="action-btn-small close-btn"
                               onClick={() => handleClosePoll(poll)}
-                              disabled={!poll.isActive}
+                              disabled={poll.status !== 'active'}
                             >
                               🔒 Close
                             </button>
@@ -966,7 +965,7 @@ const AdminPage = ({ onBack }: AdminPageProps) => {
                   <h4>{selectedPoll.title}</h4>
                   <p>{selectedPoll.description}</p>
                   <div className="poll-meta">
-                    <div><strong>Status:</strong> {selectedPoll.isActive ? 'Active' : 'Ended'}</div>
+                    <div><strong>Status:</strong> {selectedPoll.status === 'active' ? 'Active' : 'Ended'}</div>
                     <div><strong>Total Votes:</strong> {selectedPoll.totalVotes}</div>
                     <div><strong>Creator:</strong> {selectedPoll.creator}</div>
                   </div>

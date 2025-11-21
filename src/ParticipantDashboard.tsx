@@ -84,7 +84,7 @@ const ParticipantDashboard = ({ onBack, onViewPoll }: ParticipantDashboardProps)
 
             // Can claim if: poll ended, not active, has MANUAL_PULL distribution, has reward pool, hasn't claimed
             const canClaimReward =
-              !poll.isActive &&
+              poll.status !== 'active' &&
               poll.distributionType === 0 &&
               poolInMassa > 0 &&
               !hasClaimedReward &&
@@ -181,7 +181,7 @@ const ParticipantDashboard = ({ onBack, onViewPoll }: ParticipantDashboardProps)
 
   // Calculate dashboard stats
   const totalVoted = polls.length;
-  const activeVoted = polls.filter(p => p.isActive).length;
+  const activeVoted = polls.filter(p => p.status === 'active').length;
   const claimableRewards = polls.filter(p => p.canClaimReward).length;
   const totalClaimableAmount = polls
     .filter(p => p.canClaimReward)
@@ -337,8 +337,8 @@ const ParticipantDashboard = ({ onBack, onViewPoll }: ParticipantDashboardProps)
                           </div>
                         </td>
                         <td>
-                          <span className={`status-badge ${poll.isActive ? 'active' : 'ended'}`}>
-                            {poll.isActive ? 'Active' : 'Ended'}
+                          <span className={`status-badge ${poll.status === 'active' ? 'active' : 'ended'}`}>
+                            {poll.status === 'active' ? 'Active' : 'Ended'}
                           </span>
                         </td>
                         <td>
@@ -366,7 +366,7 @@ const ParticipantDashboard = ({ onBack, onViewPoll }: ParticipantDashboardProps)
                               <TrendingUpIcon sx={{ fontSize: 16, marginRight: 0.5 }} />
                               Distributed
                             </span>
-                          ) : poll.isActive ? (
+                          ) : poll.status === 'active' ? (
                             <span className="reward-status pending">
                               <HistoryIcon sx={{ fontSize: 16, marginRight: 0.5 }} />
                               Poll Active

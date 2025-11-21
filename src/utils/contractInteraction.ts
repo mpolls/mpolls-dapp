@@ -48,7 +48,6 @@ export interface ContractPoll {
   description: string;
   options: string[];
   votes: number[];
-  isActive: boolean;
   createdAt: number;
   endTime: number;
   status: 'active' | 'closed' | 'ended';
@@ -405,7 +404,6 @@ export class PollsContract {
         description: `Poll created on blockchain`,
         options: ["Option 1", "Option 2"],
         votes: [0, 0],
-        isActive: true,
         createdAt: Date.now(),
         endTime: Date.now() + (7 * 24 * 60 * 60 * 1000), // Default 7 days from now
         status: 'active' as const,
@@ -456,7 +454,7 @@ export class PollsContract {
       // Reconstruct options by joining parts between index 3 and creator
       const optionsParts = parts.slice(3, creatorIndex);
       const optionsString = optionsParts.join('|');
-      const options = optionsString.split('||').filter(opt => opt.length > 0);
+      const options = optionsString.split('§§').filter(opt => opt.length > 0); // Updated to match contract's § separator
 
       const id = parts[0];
       const title = parts[1];
@@ -499,13 +497,11 @@ export class PollsContract {
         votes.push(0);
       }
 
-      // Determine if poll is active based on contract status and time
+      // Determine display status based on contract status and time
       // NOTE: Context.timestamp() in Massa returns MILLISECONDS, not seconds (despite what comments say)
       // Contract status: 0=ACTIVE, 1=CLOSED (manually closed), 2=ENDED (time expired)
       const currentTimeMs = Date.now();
-      const isActive = contractStatus === 0 && currentTimeMs >= startTime && currentTimeMs < endTime;
 
-      // Determine display status
       let displayStatus: 'active' | 'closed' | 'ended' = 'active';
       if (contractStatus === 1) {
         displayStatus = 'closed';
@@ -532,8 +528,7 @@ export class PollsContract {
       console.log(`   Start Time: ${new Date(startTime).toLocaleString()} (${startTime} ms)`);
       console.log(`   End Time: ${new Date(endTime).toLocaleString()} (${endTime} ms)`);
       console.log(`   Current Time: ${new Date(currentTimeMs).toLocaleString()} (${currentTimeMs} ms)`);
-      console.log(`   Final Active Status: ${isActive ? 'Active' : 'Inactive'}`);
-      console.log(`   Display Status: ${displayStatus}`);
+      console.log(`   Status: ${displayStatus} (from contract status ${contractStatus})`);
       console.log(`   Votes: [${votes.join(', ')}]`);
       console.log(`   Reward Pool: ${rewardPool} nanoMASSA`);
       console.log(`   Funding Type: ${fundingType}`);
@@ -546,7 +541,6 @@ export class PollsContract {
         options,
         creator,
         votes,
-        isActive,
         createdAt: startTime, // Already in milliseconds from contract
         endTime: endTime, // Already in milliseconds from contract
         status: displayStatus,
@@ -772,7 +766,7 @@ export class PollsContract {
       console.log(`   📊 Total Polls Found: ${polls.length}`);
 
       if (polls.length > 0) {
-        const activePolls = polls.filter(p => p.isActive).length;
+        const activePolls = polls.filter(p => p.status === 'active').length;
         const inactivePolls = polls.length - activePolls;
         const totalVotes = polls.reduce((sum, p) => sum + p.votes.reduce((s, v) => s + v, 0), 0);
 
