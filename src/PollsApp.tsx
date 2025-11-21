@@ -402,22 +402,25 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
       setVotedPolls(prev => new Set(prev).add(pollId));
 
       // Show success message
-      toast.success(`Successfully voted for "${poll.options[optionIndex]}"! Redirecting to results page...`, 3000);
-
-      // Refresh polls to show updated vote counts
-      console.log('🔄 Refreshing polls to show updated vote counts...');
-      setTimeout(() => {
-        fetchPollsQuietly();
-      }, 3000);
-
+      toast.success(`Successfully voted for "${poll.options[optionIndex]}"!`, 3000);
       console.log(`✅ Successfully voted for option ${optionIndex} (${poll.options[optionIndex]}) in poll ${pollId}`);
 
-      // Redirect to results page after a short delay
+      // Wait for blockchain confirmation before refreshing and redirecting
+      // This gives the transaction time to be included in a block
       setTimeout(() => {
-        if (onNavigate) {
-          onNavigate('results', pollId.toString());
-        }
-      }, 1500);
+        toast.info('Vote confirmed! Refreshing results...', 2000);
+
+        // Refresh polls to show updated vote counts
+        console.log('🔄 Refreshing polls to show updated vote counts...');
+        fetchPollsQuietly();
+
+        // Wait a bit more before redirect to ensure vote is reflected
+        setTimeout(() => {
+          if (onNavigate) {
+            onNavigate('results', pollId.toString());
+          }
+        }, 2000); // Additional 2 seconds
+      }, 3000); // Initial 3 second wait for transaction confirmation
     } catch (error) {
       logError(error, { action: 'voting on poll', pollId: pollId.toString() });
       const friendlyError = parseBlockchainError(error, { action: 'voting on poll', pollId: pollId.toString() });

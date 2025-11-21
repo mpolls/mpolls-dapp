@@ -4,6 +4,7 @@ import { pollsContract, ContractPoll } from './utils/contractInteraction';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PieChartIcon from '@mui/icons-material/PieChart';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import './PollResults.css';
 
 interface PollResultsProps {
@@ -20,35 +21,42 @@ const PollResults: React.FC<PollResultsProps> = ({ pollId, onBack }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chartType, setChartType] = useState<ChartType>('pie');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchPoll = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      console.log(`📊 Fetching poll ${pollId} for results...`);
+      const polls = await pollsContract.getAllPolls();
+      console.log(`📊 All polls retrieved:`, polls);
+      const foundPoll = polls.find(p => p.id === pollId);
+
+      if (!foundPoll) {
+        setError(`Poll with ID ${pollId} not found`);
+        return;
+      }
+
+      console.log(`📊 Poll loaded:`, foundPoll);
+      console.log(`📊 Poll votes:`, foundPoll.votes);
+      console.log(`📊 Poll options:`, foundPoll.options);
+      setPoll(foundPoll);
+    } catch (err) {
+      console.error('Error fetching poll:', err);
+      setError('Failed to load poll results');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchPoll();
+    setIsRefreshing(false);
+  };
 
   useEffect(() => {
-    const fetchPoll = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        console.log(`📊 Fetching poll ${pollId} for results...`);
-        const polls = await pollsContract.getAllPolls();
-        console.log(`📊 All polls retrieved:`, polls);
-        const foundPoll = polls.find(p => p.id === pollId);
-
-        if (!foundPoll) {
-          setError(`Poll with ID ${pollId} not found`);
-          return;
-        }
-
-        console.log(`📊 Poll loaded:`, foundPoll);
-        console.log(`📊 Poll votes:`, foundPoll.votes);
-        console.log(`📊 Poll options:`, foundPoll.options);
-        setPoll(foundPoll);
-      } catch (err) {
-        console.error('Error fetching poll:', err);
-        setError('Failed to load poll results');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchPoll();
   }, [pollId]);
 
@@ -99,19 +107,29 @@ const PollResults: React.FC<PollResultsProps> = ({ pollId, onBack }) => {
         <button className="back-button" onClick={onBack}>
           <ArrowBackIcon /> Back to Polls
         </button>
-        <div className="chart-type-selector">
+        <div className="header-actions">
           <button
-            className={`chart-type-btn ${chartType === 'pie' ? 'active' : ''}`}
-            onClick={() => setChartType('pie')}
+            className={`refresh-button ${isRefreshing ? 'refreshing' : ''}`}
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            title="Refresh poll results"
           >
-            <PieChartIcon /> Pie Chart
+            <RefreshIcon /> {isRefreshing ? 'Refreshing...' : 'Refresh'}
           </button>
-          <button
-            className={`chart-type-btn ${chartType === 'bar' ? 'active' : ''}`}
-            onClick={() => setChartType('bar')}
-          >
-            <BarChartIcon /> Bar Chart
-          </button>
+          <div className="chart-type-selector">
+            <button
+              className={`chart-type-btn ${chartType === 'pie' ? 'active' : ''}`}
+              onClick={() => setChartType('pie')}
+            >
+              <PieChartIcon /> Pie Chart
+            </button>
+            <button
+              className={`chart-type-btn ${chartType === 'bar' ? 'active' : ''}`}
+              onClick={() => setChartType('bar')}
+            >
+              <BarChartIcon /> Bar Chart
+            </button>
+          </div>
         </div>
       </div>
 

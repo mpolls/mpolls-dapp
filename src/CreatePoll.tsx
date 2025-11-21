@@ -294,33 +294,39 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
 
       // Show success toast
       toast.success(`🎉 Poll created successfully! Poll ID: ${pollId}`, 3000);
-      setSuccess(`Poll created successfully! Poll ID: ${pollId}. Redirecting to polls list...`);
+      setSuccess(`Poll created successfully! Poll ID: ${pollId}. Waiting for blockchain confirmation...`);
 
-      // Reset form
-      setFormData({
-        title: "",
-        description: "",
-        options: ["", ""],
-        duration: 7,
-        endDateTime: getDefaultEndDateTime(),
-        allowList: "",
-        contestType: "open",
-        viewType: "text",
-        projectId: 0,
-        fundingType: "self",
-        distributionMode: "equal",
-        distributionType: "manual-pull",
-        rewardPool: 0,
-        fixedRewardAmount: 0,
-        fundingGoal: 0,
-        rewardTokenType: "native",
-        voteRewardAmount: 10
-      });
-
-      // Redirect to polls list after a short delay to show the success message
+      // Wait for blockchain confirmation before redirecting
+      // This gives the transaction time to be included in a block
       setTimeout(() => {
-        onBack(); // This will navigate back to the polls list
-      }, 2000); // 2 second delay
+        setSuccess(`Transaction confirmed! Refreshing polls list...`);
+
+        // Wait a bit more before redirect to ensure new poll is queryable
+        setTimeout(() => {
+          // Reset form
+          setFormData({
+            title: "",
+            description: "",
+            options: ["", ""],
+            duration: 7,
+            endDateTime: getDefaultEndDateTime(),
+            allowList: "",
+            contestType: "open",
+            viewType: "text",
+            projectId: 0,
+            fundingType: "self",
+            distributionMode: "equal",
+            distributionType: "manual-pull",
+            rewardPool: 0,
+            fixedRewardAmount: 0,
+            fundingGoal: 0,
+            rewardTokenType: "native",
+            voteRewardAmount: 10
+          });
+
+          onBack(); // This will navigate back to the polls list
+        }, 2000); // Additional 2 seconds
+      }, 3000); // Initial 3 second wait for transaction confirmation
 
     } catch (err) {
       logError(err, { action: 'creating poll' });

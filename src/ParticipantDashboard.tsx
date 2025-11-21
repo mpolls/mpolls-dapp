@@ -117,11 +117,21 @@ const ParticipantDashboard = ({ onBack, onViewPoll }: ParticipantDashboardProps)
     try {
       await pollsContract.claimReward(pollId);
       toast.success("Reward claimed successfully!");
-      loadParticipantData(); // Reload to update claim status
+
+      // Wait for blockchain confirmation before refreshing
+      setTimeout(() => {
+        toast.info('Claim confirmed! Refreshing your dashboard...', 2000);
+
+        // Wait a bit more before refresh to ensure claim is reflected
+        setTimeout(async () => {
+          await loadParticipantData(); // Reload to update claim status
+          setIsClaiming(false);
+          setClaimingPollId(null);
+        }, 2000); // Additional 2 seconds
+      }, 3000); // Initial 3 second wait for transaction confirmation
     } catch (err) {
       console.error("Error claiming reward:", err);
       toast.error("Failed to claim reward: " + (err instanceof Error ? err.message : "Unknown error"));
-    } finally {
       setIsClaiming(false);
       setClaimingPollId(null);
     }
@@ -151,14 +161,24 @@ const ParticipantDashboard = ({ onBack, onViewPoll }: ParticipantDashboardProps)
 
     if (successCount > 0) {
       toast.success(`Successfully claimed ${successCount} reward(s)!`);
-      loadParticipantData();
+
+      // Wait for blockchain confirmation before refreshing
+      setTimeout(() => {
+        toast.info('Claims confirmed! Refreshing your dashboard...', 2000);
+
+        // Wait a bit more before refresh to ensure all claims are reflected
+        setTimeout(async () => {
+          await loadParticipantData();
+          setIsClaiming(false);
+        }, 2000); // Additional 2 seconds
+      }, 3000); // Initial 3 second wait for transaction confirmation
+    } else {
+      setIsClaiming(false);
     }
 
     if (failCount > 0) {
       toast.error(`Failed to claim ${failCount} reward(s)`);
     }
-
-    setIsClaiming(false);
   };
 
   const getDistributionModeBadge = (mode: number) => {
