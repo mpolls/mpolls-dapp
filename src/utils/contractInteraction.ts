@@ -465,6 +465,7 @@ export class PollsContract {
       const contractStatus = parseInt(parts[creatorIndex + 3]); // 0=ACTIVE, 1=CLOSED, 2=ENDED
       const voteCountStr = parts[creatorIndex + 4] || '';
 
+      console.log(`🗳️ Raw vote count string at index ${creatorIndex + 4}: "${voteCountStr}"`);
       console.log(`🔍 Parsing economics fields from index ${creatorIndex + 5}:`);
       console.log(`   Total parts: ${parts.length}`);
       console.log(`   Parts after votes: [${parts.slice(creatorIndex + 5).join(', ')}]`);
@@ -747,10 +748,19 @@ export class PollsContract {
           console.log(`🔍 Processing poll data: "${pollDataStr.substring(0, 100)}${pollDataStr.length > 100 ? '...' : ''}"`);
 
           const poll = this.parsePollData(pollDataStr);
-          if (poll && !processedIds.has(poll.id)) {
-            polls.push(poll);
-            processedIds.add(poll.id);
-            console.log(`✅ Successfully parsed poll #${poll.id}: "${poll.title}"`);
+          if (poll) {
+            // Always update to the latest version of the poll (in case of vote updates)
+            const existingIndex = polls.findIndex(p => p.id === poll.id);
+            if (existingIndex >= 0) {
+              // Replace with newer data
+              polls[existingIndex] = poll;
+              console.log(`🔄 Updated poll #${poll.id}: "${poll.title}" with latest data`);
+            } else {
+              // Add new poll
+              polls.push(poll);
+              processedIds.add(poll.id);
+              console.log(`✅ Successfully parsed poll #${poll.id}: "${poll.title}"`);
+            }
           }
         } catch (parseError) {
           console.log(`⚠️ Failed to parse poll event:`, parseError);

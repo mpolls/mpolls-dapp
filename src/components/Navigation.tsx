@@ -17,8 +17,8 @@ import PeopleIcon from '@mui/icons-material/People';
 import { pollsContract } from '../utils/contractInteraction';
 
 interface NavigationProps {
-  onNavigate: (page: 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap' | 'creator' | 'participant') => void;
-  currentPage: 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap' | 'creator' | 'participant';
+  onNavigate: (page: 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap' | 'creator' | 'participant' | 'results', pollId?: string) => void;
+  currentPage: 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap' | 'creator' | 'participant' | 'results';
   onScrollToSection?: (sectionId: string) => void;
   onWalletConnect?: (address: string, name: string) => void;
 }

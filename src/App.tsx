@@ -6,6 +6,7 @@ import TokenPage from './TokenPage';
 import SwapPage from './SwapPage';
 import CreatorDashboard from './CreatorDashboard';
 import ParticipantDashboard from './ParticipantDashboard';
+import PollResults from './PollResults';
 import Navigation from './components/Navigation';
 import { pollsContract, ContractPoll } from './utils/contractInteraction';
 import { ToastProvider } from './components/ToastContainer';
@@ -16,7 +17,7 @@ import TableChartIcon from '@mui/icons-material/TableChart';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import './App.css';
 
-type PageType = 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap' | 'creator' | 'participant';
+type PageType = 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap' | 'creator' | 'participant' | 'results';
 
 function App() {
   const [currentText, setCurrentText] = useState(0);
@@ -27,6 +28,7 @@ function App() {
   const [walletAddress, setWalletAddress] = useState<string>('');
   const [walletName, setWalletName] = useState<string>('');
   const [isWalletConnected, setIsWalletConnected] = useState(false);
+  const [selectedPollId, setSelectedPollId] = useState<string>('');
 
   const dynamicTexts = ['business', 'surveys', 'art contests', 'debates'];
 
@@ -91,8 +93,11 @@ function App() {
 
   const companies = ['TechCorp', 'InnovateCo', 'StartupX', 'BigBrand', 'CreativeStudio'];
 
-  const handleNavigation = (page: PageType) => {
+  const handleNavigation = (page: PageType, pollId?: string) => {
     setCurrentPage(page);
+    if (pollId) {
+      setSelectedPollId(pollId);
+    }
   };
 
   const scrollToSection = (sectionId: string) => {
@@ -103,6 +108,22 @@ function App() {
   };
 
   // Render different pages based on current page
+  if (currentPage === 'results') {
+    return (
+      <ToastProvider>
+        <Navigation
+          onNavigate={handleNavigation}
+          currentPage={currentPage}
+          onWalletConnect={handleWalletConnect}
+        />
+        <PollResults
+          pollId={selectedPollId}
+          onBack={() => handleNavigation('polls')}
+        />
+      </ToastProvider>
+    );
+  }
+
   if (currentPage === 'swap') {
     return (
       <ToastProvider>
@@ -169,9 +190,8 @@ function App() {
         <CreatorDashboard
           onBack={() => handleNavigation('polls')}
           onViewPoll={(pollId) => {
-            // Navigate to polls page which will handle poll selection
-            handleNavigation('polls');
-            // Note: The actual poll selection would need to be handled in PollsApp
+            // Navigate to results page to view poll results
+            handleNavigation('results', pollId.toString());
           }}
         />
       </ToastProvider>
@@ -189,8 +209,8 @@ function App() {
         <ParticipantDashboard
           onBack={() => handleNavigation('polls')}
           onViewPoll={(pollId) => {
-            // Navigate to polls page to view the poll
-            handleNavigation('polls');
+            // Navigate to results page to view poll results
+            handleNavigation('results', pollId.toString());
           }}
         />
       </ToastProvider>

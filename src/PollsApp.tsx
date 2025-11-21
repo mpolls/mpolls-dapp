@@ -39,11 +39,11 @@ interface Poll extends Omit<ContractPoll, 'id' | 'votes'> {
   rewardsDistributed: boolean;
 }
 
-type PageType = 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap' | 'creator' | 'participant';
+type PageType = 'home' | 'polls' | 'create' | 'admin' | 'projects' | 'token' | 'swap' | 'creator' | 'participant' | 'results';
 
 interface PollsAppProps {
   initialView?: PageType;
-  onNavigate?: (page: PageType) => void;
+  onNavigate?: (page: PageType, pollId?: string) => void;
 }
 
 const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }) => {
@@ -81,10 +81,10 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
 
   const CONTRACT_CREATOR_ADDRESS = "AU1Pd3bod1Js2xD71GLFd1Q1dA8tnugsHroL54Rn7SzYY5KiozfS";
 
-  const handleNavigation = (page: PageType) => {
+  const handleNavigation = (page: PageType, pollId?: string) => {
     setCurrentView(page);
     if (onNavigate) {
-      onNavigate(page);
+      onNavigate(page, pollId);
     }
   };
 
@@ -413,7 +413,7 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
       setVotedPolls(prev => new Set(prev).add(pollId));
 
       // Show success message
-      toast.success(`Successfully voted for "${poll.options[optionIndex]}"! Your vote has been recorded on the blockchain.`, 6000);
+      toast.success(`Successfully voted for "${poll.options[optionIndex]}"! Redirecting to results page...`, 3000);
 
       // Refresh polls to show updated vote counts
       console.log('🔄 Refreshing polls to show updated vote counts...');
@@ -422,6 +422,13 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
       }, 3000);
 
       console.log(`✅ Successfully voted for option ${optionIndex} (${poll.options[optionIndex]}) in poll ${pollId}`);
+
+      // Redirect to results page after a short delay
+      setTimeout(() => {
+        if (onNavigate) {
+          onNavigate('results', pollId.toString());
+        }
+      }, 1500);
     } catch (error) {
       logError(error, { action: 'voting on poll', pollId: pollId.toString() });
       const friendlyError = parseBlockchainError(error, { action: 'voting on poll', pollId: pollId.toString() });
