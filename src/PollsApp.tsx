@@ -183,7 +183,8 @@ const PollsApp: React.FC<PollsAppProps> = ({ initialView = 'polls', onNavigate }
           fixedRewardAmount: (contractPoll.fixedRewardAmount || 0) / 1e9,
           fundingGoal: (contractPoll.fundingGoal || 0) / 1e9,
           treasuryApproved: contractPoll.treasuryApproved || false,
-          rewardsDistributed: contractPoll.rewardsDistributed || false
+          rewardsDistributed: contractPoll.rewardsDistributed || false,
+          distributionTime: contractPoll.distributionTime || 0
         };
 
         // Log the converted display poll

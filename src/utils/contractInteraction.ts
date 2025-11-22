@@ -416,7 +416,8 @@ export class PollsContract {
         fixedRewardAmount: 0,
         fundingGoal: 0,
         treasuryApproved: false,
-        rewardsDistributed: false
+        rewardsDistributed: false,
+        distributionTime: 0
       };
     } catch (error) {
       console.error("Error fetching poll:", error);
