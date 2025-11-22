@@ -61,6 +61,7 @@ export interface ContractPoll {
   fundingGoal: number; // Target amount for community-funded polls
   treasuryApproved: boolean; // Approval status for treasury-funded polls
   rewardsDistributed: boolean; // Whether rewards have been distributed
+  distributionTime: number; // Timestamp in milliseconds when auto-distribution should occur (0 = not set)
 }
 
 export class PollsContract {
@@ -480,6 +481,8 @@ export class PollsContract {
       const fundingGoal = parts.length > creatorIndex + 11 ? parseInt(parts[creatorIndex + 11]) || 0 : 0;
       const treasuryApproved = parts.length > creatorIndex + 12 ? parts[creatorIndex + 12] === 'true' : false;
       const rewardsDistributed = parts.length > creatorIndex + 13 ? parts[creatorIndex + 13] === 'true' : false;
+      // Skip rewardTokenType (14), voteRewardAmount (15), createPollRewardAmount (16)
+      const distributionTime = parts.length > creatorIndex + 17 ? parseInt(parts[creatorIndex + 17]) || 0 : 0;
 
       console.log(`📊 Parsed economics fields:`);
       console.log(`   projectId: ${projectId} (raw: "${parts[creatorIndex + 5] || 'undefined'}")`);
@@ -487,6 +490,7 @@ export class PollsContract {
       console.log(`   fundingType: ${fundingType} (raw: "${parts[creatorIndex + 7] || 'undefined'}")`);
       console.log(`   treasuryApproved: ${treasuryApproved} (raw: "${parts[creatorIndex + 12] || 'undefined'}")`);
       console.log(`   rewardsDistributed: ${rewardsDistributed} (raw: "${parts[creatorIndex + 13] || 'undefined'}")`);
+      console.log(`   distributionTime: ${distributionTime} (raw: "${parts[creatorIndex + 17] || 'undefined'}")`);
 
       // Parse vote counts (comma-separated)
       const votes = voteCountStr.length > 0 ?
@@ -555,7 +559,8 @@ export class PollsContract {
         fixedRewardAmount,
         fundingGoal,
         treasuryApproved,
-        rewardsDistributed
+        rewardsDistributed,
+        distributionTime
       };
     } catch (error) {
       console.error('💥 Error parsing poll data:', error);
@@ -837,7 +842,7 @@ export class PollsContract {
   }
 
   // Admin function to close a poll (only creator can do this)
-  async closePoll(pollId: string): Promise<boolean> {
+  async closePoll(pollId: string, distributionTime: number = 0): Promise<boolean> {
     if (!this.account) {
       throw new Error("Wallet not connected. Please connect your wallet first.");
     }
@@ -846,11 +851,14 @@ export class PollsContract {
       console.log("🔒 Closing poll with parameters:", {
         contractAddress: this.contractAddress,
         pollId,
+        distributionTime: distributionTime > 0 ? new Date(distributionTime).toISOString() : 'Not set',
         walletName: this.getWalletName(),
         network: "Massa Buildnet"
       });
 
-      const args = new Args().addString(pollId);
+      const args = new Args()
+        .addString(pollId)
+        .addU64(BigInt(distributionTime)); // Add distribution time in milliseconds (0 = not set)
 
       const result = await this.account.callSC({
         target: this.contractAddress,
@@ -861,6 +869,9 @@ export class PollsContract {
       });
 
       console.log("✅ Poll close transaction result:", result);
+      if (distributionTime > 0) {
+        console.log(`⏰ Auto-distribution scheduled for: ${new Date(distributionTime).toLocaleString()}`);
+      }
       return true;
     } catch (error) {
       console.error("Error closing poll:", error);

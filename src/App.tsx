@@ -79,7 +79,33 @@ function App() {
       }
     };
 
+    // Initial fetch
     fetchStatistics();
+
+    // Refresh statistics when user returns to the page
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('👁️ Page became visible - refreshing statistics...');
+        fetchStatistics();
+      }
+    };
+
+    // Add visibility change listener
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Also refresh periodically every 30 seconds while page is visible
+    const intervalId = setInterval(() => {
+      if (!document.hidden) {
+        console.log('🔄 Periodic refresh - updating statistics...');
+        fetchStatistics();
+      }
+    }, 30000); // 30 seconds
+
+    // Cleanup listeners on unmount
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(intervalId);
+    };
   }, []);
 
   // Fetch featured polls from contract
