@@ -95,7 +95,8 @@ const AdminPage = ({ onBack }: AdminPageProps) => {
           fixedRewardAmount: contractPoll.fixedRewardAmount || 0,
           fundingGoal: contractPoll.fundingGoal || 0,
           treasuryApproved: contractPoll.treasuryApproved || false,
-          rewardsDistributed: contractPoll.rewardsDistributed || false
+          rewardsDistributed: contractPoll.rewardsDistributed || false,
+          distributionTime: contractPoll.distributionTime || 0
         };
       });
       

@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { pollsContract, ContractPoll } from "./utils/contractInteraction";
 import { useToast } from "./components/ToastContainer";
+import DistributionTimePicker from "./components/DistributionTimePicker";
+import { DistributionCountdown } from "./components/DistributionCountdown";
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import PollIcon from '@mui/icons-material/Poll';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -10,6 +12,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import BlockIcon from '@mui/icons-material/Block';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 
 interface CreatorDashboardProps {
   onBack: () => void;
@@ -29,6 +32,9 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
   const [showClaimingModal, setShowClaimingModal] = useState(false);
   const [selectedPollForClaiming, setSelectedPollForClaiming] = useState<ContractPoll | null>(null);
   const [claimingData, setClaimingData] = useState<any[]>([]);
+  const [showDistributionModal, setShowDistributionModal] = useState(false);
+  const [selectedPollForDistribution, setSelectedPollForDistribution] = useState<ContractPoll | null>(null);
+  const [distributionTimestamp, setDistributionTimestamp] = useState<number>(0);
 
   useEffect(() => {
     loadCreatorPolls();
@@ -148,25 +154,64 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
   };
 
   const handleClosePoll = async (pollId: string) => {
+    // Find the poll to check if it has auto-distribute
+    const poll = polls.find(p => p.id.toString() === pollId);
+
+    if (poll && poll.distributionType === 2) {
+      // Auto-distribute poll - show modal to select distribution time
+      setSelectedPollForDistribution(poll);
+      setShowDistributionModal(true);
+      return;
+    }
+
+    // Non-auto-distribute poll - close immediately
     if (!confirm("Are you sure you want to close this poll? This will stop accepting votes.")) {
       return;
     }
 
     try {
-      await pollsContract.closePoll(pollId);
+      await pollsContract.closePoll(pollId, 0); // 0 = no distribution time
       toast.success(`Poll #${pollId} has been closed successfully!`);
 
       // Wait for blockchain confirmation before refreshing
       setTimeout(() => {
         toast.info('Poll closed! Refreshing polls list...', 2000);
-
-        // Wait a bit more before refresh to ensure status change is reflected
         setTimeout(async () => {
           await loadCreatorPolls();
-        }, 2000); // Additional 2 seconds
-      }, 3000); // Initial 3 second wait for transaction confirmation
+        }, 2000);
+      }, 3000);
     } catch (err) {
       console.error("Error closing poll:", err);
+      toast.error(`Failed to close poll: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleConfirmDistributionTime = async () => {
+    if (!selectedPollForDistribution) return;
+
+    if (distributionTimestamp === 0) {
+      toast.error("Please select a valid distribution time");
+      return;
+    }
+
+    try {
+      // Context.timestamp() returns milliseconds, so pass timestamp as-is
+      await pollsContract.closePoll(selectedPollForDistribution.id.toString(), distributionTimestamp);
+      toast.success(`Poll #${selectedPollForDistribution.id} closed with auto-distribution scheduled!`);
+
+      setShowDistributionModal(false);
+      setSelectedPollForDistribution(null);
+      setDistributionTimestamp(0);
+
+      // Wait for blockchain confirmation before refreshing
+      setTimeout(() => {
+        toast.info('Poll closed! Refreshing polls list...', 2000);
+        setTimeout(async () => {
+          await loadCreatorPolls();
+        }, 2000);
+      }, 3000);
+    } catch (err) {
+      console.error("Error closing poll with distribution time:", err);
       toast.error(`Failed to close poll: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
@@ -211,6 +256,15 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
       case 0: return "Equal Split";
       case 1: return "Fixed Reward";
       case 2: return "Weighted";
+      default: return "Unknown";
+    }
+  };
+
+  const getDistributionTypeBadge = (type: number) => {
+    switch (type) {
+      case 0: return "Manual Pull";
+      case 1: return "Manual Push";
+      case 2: return "Auto-Distribute";
       default: return "Unknown";
     }
   };
@@ -402,7 +456,8 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
                   <th>Status</th>
                   <th>Funding Type</th>
                   <th>Pool Balance</th>
-                  <th>Distribution</th>
+                  <th>Distribution Mode</th>
+                  <th>Distribution Type</th>
                   <th>Capacity</th>
                   <th>Actions</th>
                 </tr>
@@ -443,6 +498,14 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
                       </td>
                       <td>{getDistributionModeBadge(poll.distributionMode || 0)}</td>
                       <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div>{getDistributionTypeBadge(poll.distributionType || 0)}</div>
+                          {poll.distributionType === 2 && poll.status === 'closed' && poll.distributionTime > 0 && (
+                            <DistributionCountdown distributionTime={poll.distributionTime} />
+                          )}
+                        </div>
+                      </td>
+                      <td>
                         <div className={`capacity-cell ${needsFunding ? 'low' : ''}`}>
                           {capacity > 0 ? `~${capacity}` : 'N/A'}
                           {needsFunding && <WarningIcon sx={{ fontSize: 16, marginLeft: 0.5 }} />}
@@ -466,7 +529,7 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
                               <BlockIcon sx={{ fontSize: 18 }} />
                             </button>
                           )}
-                          {(poll.status === 'closed' || poll.status === 'ended') && (
+                          {(poll.status === 'closed' || poll.status === 'ended') && poll.distributionType !== 2 && (
                             <button
                               className="action-btn claiming"
                               onClick={() => handleSetForClaiming(poll.id)}
@@ -613,6 +676,57 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setShowClaimingModal(false)}>
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Distribution Time Modal */}
+      {showDistributionModal && selectedPollForDistribution && (
+        <div className="modal-overlay" onClick={() => setShowDistributionModal(false)}>
+          <div className="modal-content distribution-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>
+                <ScheduleIcon sx={{ verticalAlign: 'middle', marginRight: 1 }} />
+                Schedule Auto-Distribution
+              </h2>
+              <button className="close-btn" onClick={() => setShowDistributionModal(false)}>×</button>
+            </div>
+
+            <div className="modal-body">
+              <div className="poll-info">
+                <h3>{selectedPollForDistribution.title}</h3>
+                <p className="poll-description">{selectedPollForDistribution.description}</p>
+              </div>
+
+              <div className="distribution-info-box">
+                <p>
+                  <strong>Distribution Type:</strong> Auto-Distribute<br />
+                  <strong>Reward Pool:</strong> {(selectedPollForDistribution.rewardPool / 1e9).toFixed(2)} MASSA
+                </p>
+                <p className="info-note">
+                  When you close this poll, you need to specify when the rewards should be automatically
+                  distributed to voters. Choose a delay from now or a specific date and time.
+                </p>
+              </div>
+
+              <DistributionTimePicker
+                onTimeSelect={setDistributionTimestamp}
+                minDate={new Date()}
+              />
+            </div>
+
+            <div className="modal-footer">
+              <button
+                className="btn-primary"
+                onClick={handleConfirmDistributionTime}
+                disabled={distributionTimestamp === 0}
+              >
+                Close Poll & Schedule Distribution
+              </button>
+              <button className="btn-secondary" onClick={() => setShowDistributionModal(false)}>
+                Cancel
               </button>
             </div>
           </div>

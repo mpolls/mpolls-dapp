@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { pollsContract, PollCreationParams, ContractProject } from "./utils/contractInteraction";
 import { parseBlockchainError, logError } from "./utils/errorHandling";
 import { useToast } from "./components/ToastContainer";
@@ -53,11 +53,15 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
   const [projects, setProjects] = useState<ContractProject[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [creationMode, setCreationMode] = useState<'form' | 'ai-chat'>('form');
+  const [rewardPoolError, setRewardPoolError] = useState("");
 
   // Multi-step form state
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
   const [isStepChanging, setIsStepChanging] = useState(false);
+
+  // Refs for form fields
+  const rewardPoolInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     checkWalletConnection();
@@ -124,6 +128,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
     if (formData.options.some(opt => !opt.trim())) return "All options must be filled";
     if (formData.options.length < 2) return "At least 2 options required";
     if (formData.duration < 1) return "Duration must be at least 1 day";
+    if (formData.rewardPool <= 0) return "rewardPool"; // Return field identifier
     return "";
   };
 
@@ -173,13 +178,8 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
     }
 
     if (step === 3) {
-      // Validate Step 3: Economics
-      if (formData.distributionMode === "fixed" && formData.fixedRewardAmount <= 0) {
-        return "Fixed reward amount must be greater than 0";
-      }
-      if (formData.fundingType === "community" && formData.fundingGoal <= 0) {
-        return "Funding goal must be greater than 0 for community-funded polls";
-      }
+      // Step 3: Economics - no validation needed on navigation
+      // Validation happens when clicking "Create Poll" button
     }
 
     return null;
@@ -198,6 +198,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
       setIsStepChanging(true);
       setCurrentStep(currentStep + 1);
       setError("");
+      setRewardPoolError(""); // Clear any field-specific errors
       window.scrollTo({ top: 0, behavior: 'smooth' });
       console.log('✅ Step advanced to:', currentStep + 1);
 
@@ -213,6 +214,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
       setError("");
+      setRewardPoolError(""); // Clear any field-specific errors
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -234,7 +236,17 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
 
     const validationError = validateForm();
     if (validationError) {
-      setError(validationError);
+      if (validationError === "rewardPool") {
+        setRewardPoolError("Total Reward Pool must be greater than 0");
+        setError("");
+        setTimeout(() => {
+          rewardPoolInputRef.current?.focus();
+          rewardPoolInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      } else {
+        setError(validationError);
+        setRewardPoolError("");
+      }
       return;
     }
 
@@ -680,6 +692,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                     <input
                       type="number"
                       id="rewardPool"
+                      ref={rewardPoolInputRef}
                       value={formData.rewardPool}
                       onChange={(e) => {
                         const pool = parseFloat(e.target.value) || 0;
@@ -688,10 +701,20 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                           rewardPool: pool,
                           voteRewardAmount: pool // Keep voteRewardAmount in sync for backward compatibility
                         }));
+                        // Clear error when user starts typing
+                        if (rewardPoolError) {
+                          setRewardPoolError("");
+                        }
                       }}
                       min="0"
                       step="0.1"
+                      className={rewardPoolError ? "input-error" : ""}
                     />
+                    {rewardPoolError && (
+                      <div className="field-error">
+                        ⚠️ {rewardPoolError}
+                      </div>
+                    )}
                     <small>
                       Total amount of MASSA to allocate for rewarding poll respondents (transferred from your wallet)
                     </small>
@@ -821,13 +844,13 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                           checked={formData.distributionType === "autonomous"}
                           onChange={(e) => setFormData(prev => ({ ...prev, distributionType: e.target.value as "manual-pull" | "manual-push" | "autonomous" }))}
                         />
-                        <span>Autonomous</span>
+                        <span>Auto-Distribute</span>
                       </label>
                     </div>
                     <small>
                       {formData.distributionType === "manual-pull" && "Respondents claim their rewards after poll ends"}
                       {formData.distributionType === "manual-push" && "You trigger reward distribution to all respondents"}
-                      {formData.distributionType === "autonomous" && "Automatic distribution by smart contract when poll ends"}
+                      {formData.distributionType === "autonomous" && "Automatic distribution by smart contract at scheduled time after poll closes"}
                     </small>
                   </div>
                 </div>
