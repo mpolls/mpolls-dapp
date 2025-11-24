@@ -6,51 +6,15 @@
   margin: 1rem 0;
 }
 
-.mode-toggle {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
-  padding: 0.25rem;
-}
-
-.mode-btn {
-  flex: 1;
-  padding: 0.75rem 1rem;
-  border: none;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.7);
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.95rem;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-.mode-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-}
-
-.mode-btn.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-}
-
-.delay-picker,
-.datetime-picker {
+.delay-picker {
   margin-bottom: 1.5rem;
 }
 
-.delay-input-group,
-.datetime-input-group {
+.delay-input-group {
   margin-bottom: 1rem;
 }
 
-.delay-input-group label,
-.datetime-input-group label {
+.delay-input-group label {
   display: block;
   margin-bottom: 0.5rem;
   color: rgba(255, 255, 255, 0.9);
@@ -87,9 +51,7 @@
 }
 
 .delay-amount-input:focus,
-.delay-unit-select:focus,
-.date-input:focus,
-.time-input:focus {
+.delay-unit-select:focus {
   outline: none;
   border-color: #667eea;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
@@ -103,23 +65,6 @@
   color: rgba(255, 255, 255, 0.9);
   font-size: 0.9rem;
   margin-top: 1rem;
-}
-
-.date-input,
-.time-input {
-  width: 100%;
-  padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 8px;
-  color: white;
-  font-size: 1rem;
-}
-
-.date-input::-webkit-calendar-picker-indicator,
-.time-input::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-  cursor: pointer;
 }
 
 .calculated-time {

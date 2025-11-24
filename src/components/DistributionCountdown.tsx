@@ -3,9 +3,10 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 interface DistributionCountdownProps {
   distributionTime: number; // timestamp in milliseconds
+  rewardsDistributed?: boolean; // whether rewards have been distributed
 }
 
-export const DistributionCountdown = ({ distributionTime }: DistributionCountdownProps) => {
+export const DistributionCountdown = ({ distributionTime, rewardsDistributed = false }: DistributionCountdownProps) => {
   const [timeRemaining, setTimeRemaining] = useState<string>('');
   const [isPast, setIsPast] = useState(false);
 
@@ -16,7 +17,12 @@ export const DistributionCountdown = ({ distributionTime }: DistributionCountdow
 
       if (diff <= 0) {
         setIsPast(true);
-        setTimeRemaining('Pending distribution');
+        // Check if rewards have actually been distributed
+        if (rewardsDistributed) {
+          setTimeRemaining('Distributed');
+        } else {
+          setTimeRemaining('Distribution executing...');
+        }
         return;
       }
 
@@ -28,15 +34,15 @@ export const DistributionCountdown = ({ distributionTime }: DistributionCountdow
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
-      // Format the countdown string
+      // Format the countdown string with "~" to indicate approximate timing
       if (days > 0) {
-        setTimeRemaining(`${days}d ${hours}h ${minutes}m`);
+        setTimeRemaining(`~${days}d ${hours}h ${minutes}m`);
       } else if (hours > 0) {
-        setTimeRemaining(`${hours}h ${minutes}m ${seconds}s`);
+        setTimeRemaining(`~${hours}h ${minutes}m ${seconds}s`);
       } else if (minutes > 0) {
-        setTimeRemaining(`${minutes}m ${seconds}s`);
+        setTimeRemaining(`~${minutes}m ${seconds}s`);
       } else {
-        setTimeRemaining(`${seconds}s`);
+        setTimeRemaining(`~${seconds}s`);
       }
     };
 
@@ -47,21 +53,26 @@ export const DistributionCountdown = ({ distributionTime }: DistributionCountdow
     const interval = setInterval(updateCountdown, 1000);
 
     return () => clearInterval(interval);
-  }, [distributionTime]);
+  }, [distributionTime, rewardsDistributed]);
 
   if (distributionTime === 0) {
     return null;
   }
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '4px',
-      fontSize: '0.85rem',
-      color: isPast ? '#f59e0b' : '#10b981',
-      fontWeight: 500
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        fontSize: '0.85rem',
+        color: rewardsDistributed ? '#10b981' : (isPast ? '#f59e0b' : '#10b981'),
+        fontWeight: 500
+      }}
+      title={rewardsDistributed
+        ? "Rewards have been distributed to all voters"
+        : "Approximate time. Actual execution may occur within 16-32 seconds of scheduled time."}
+    >
       <AccessTimeIcon sx={{ fontSize: 16 }} />
       <span>{timeRemaining}</span>
     </div>

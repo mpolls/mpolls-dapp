@@ -6,48 +6,34 @@ interface DistributionTimePickerProps {
   minDate?: Date;
 }
 
-type TimingMode = 'delay' | 'datetime';
-
 const DistributionTimePicker: React.FC<DistributionTimePickerProps> = ({
   onTimeSelect,
   minDate = new Date()
 }) => {
-  const [mode, setMode] = useState<TimingMode>('delay');
-  const [delayAmount, setDelayAmount] = useState<number>(24);
+  const [delayAmount, setDelayAmount] = useState<number>(1);
   const [delayUnit, setDelayUnit] = useState<'hours' | 'days'>('hours');
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedTime, setSelectedTime] = useState<string>('12:00');
   const [calculatedTimestamp, setCalculatedTimestamp] = useState<number>(0);
+
+  // Constraints: min 32 seconds, max 44 hours (10,000 periods)
+  const MIN_DELAY_MS = 32000; // 32 seconds (2 periods)
+  const MAX_DELAY_MS = 44 * 60 * 60 * 1000; // 44 hours (10,000 periods)
 
   // Calculate timestamp whenever inputs change
   useEffect(() => {
     const now = Date.now();
-    let timestamp: number;
+    const delayMs = delayAmount * (delayUnit === 'hours' ? 3600000 : 86400000);
+    let timestamp = now + delayMs;
 
-    if (mode === 'delay') {
-      const delayMs = delayAmount * (delayUnit === 'hours' ? 3600000 : 86400000);
-      timestamp = now + delayMs;
-    } else {
-      // Combine date and time
-      if (selectedDate && selectedTime) {
-        const dateTimeStr = `${selectedDate}T${selectedTime}`;
-        timestamp = new Date(dateTimeStr).getTime();
-      } else {
-        timestamp = 0;
-      }
+    // Enforce constraints
+    if (delayMs < MIN_DELAY_MS) {
+      timestamp = now + MIN_DELAY_MS;
+    } else if (delayMs > MAX_DELAY_MS) {
+      timestamp = now + MAX_DELAY_MS;
     }
 
     setCalculatedTimestamp(timestamp);
     onTimeSelect(timestamp);
-  }, [mode, delayAmount, delayUnit, selectedDate, selectedTime, onTimeSelect]);
-
-  // Set default date to tomorrow
-  useEffect(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const dateStr = tomorrow.toISOString().split('T')[0];
-    setSelectedDate(dateStr);
-  }, []);
+  }, [delayAmount, delayUnit, onTimeSelect, MIN_DELAY_MS, MAX_DELAY_MS]);
 
   const formatTimestamp = (timestamp: number): string => {
     if (timestamp === 0) return 'Invalid date/time';
@@ -62,78 +48,51 @@ const DistributionTimePicker: React.FC<DistributionTimePickerProps> = ({
     });
   };
 
-  const getMinDateTime = (): string => {
-    const min = minDate || new Date();
-    return min.toISOString().slice(0, 16);
-  };
-
   return (
     <div className="distribution-time-picker">
-      <div className="mode-toggle">
-        <button
-          className={`mode-btn ${mode === 'delay' ? 'active' : ''}`}
-          onClick={() => setMode('delay')}
-        >
-          Delay
-        </button>
-        <button
-          className={`mode-btn ${mode === 'datetime' ? 'active' : ''}`}
-          onClick={() => setMode('datetime')}
-        >
-          Specific Time
-        </button>
+      <div className="delay-picker">
+        <div className="delay-input-group">
+          <label>Distribute rewards after:</label>
+          <div className="delay-controls">
+            <input
+              type="number"
+              min="1"
+              max="44"
+              value={delayAmount}
+              onChange={(e) => {
+                const val = parseInt(e.target.value) || 1;
+                // Enforce max based on unit
+                if (delayUnit === 'hours') {
+                  setDelayAmount(Math.min(val, 44));
+                } else {
+                  setDelayAmount(Math.min(val, 1));
+                }
+              }}
+              className="delay-amount-input"
+            />
+            <select
+              value={delayUnit}
+              onChange={(e) => {
+                const newUnit = e.target.value as 'hours' | 'days';
+                setDelayUnit(newUnit);
+                // Adjust amount if it exceeds new unit's max
+                if (newUnit === 'days' && delayAmount > 1) {
+                  setDelayAmount(1);
+                } else if (newUnit === 'hours' && delayAmount > 44) {
+                  setDelayAmount(44);
+                }
+              }}
+              className="delay-unit-select"
+            >
+              <option value="hours">Hours (max 44)</option>
+              <option value="days">Days (max 1)</option>
+            </select>
+          </div>
+        </div>
+        <div className="delay-info">
+          Distribution will occur approximately {delayAmount} {delayUnit} after poll closes (min: 32 seconds, max: 44 hours)
+        </div>
       </div>
-
-      {mode === 'delay' ? (
-        <div className="delay-picker">
-          <div className="delay-input-group">
-            <label>Distribute rewards after:</label>
-            <div className="delay-controls">
-              <input
-                type="number"
-                min="1"
-                max="365"
-                value={delayAmount}
-                onChange={(e) => setDelayAmount(parseInt(e.target.value) || 1)}
-                className="delay-amount-input"
-              />
-              <select
-                value={delayUnit}
-                onChange={(e) => setDelayUnit(e.target.value as 'hours' | 'days')}
-                className="delay-unit-select"
-              >
-                <option value="hours">Hours</option>
-                <option value="days">Days</option>
-              </select>
-            </div>
-          </div>
-          <div className="delay-info">
-            Distribution will occur approximately {delayAmount} {delayUnit} after poll closes
-          </div>
-        </div>
-      ) : (
-        <div className="datetime-picker">
-          <div className="datetime-input-group">
-            <label>Distribution Date:</label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              min={minDate.toISOString().split('T')[0]}
-              className="date-input"
-            />
-          </div>
-          <div className="datetime-input-group">
-            <label>Distribution Time:</label>
-            <input
-              type="time"
-              value={selectedTime}
-              onChange={(e) => setSelectedTime(e.target.value)}
-              className="time-input"
-            />
-          </div>
-        </div>
-      )}
 
       <div className="calculated-time">
         <div className="calculated-label">Scheduled for:</div>
@@ -146,8 +105,9 @@ const DistributionTimePicker: React.FC<DistributionTimePickerProps> = ({
       </div>
 
       <div className="distribution-note">
-        <strong>Note:</strong> Distribution will occur during the next autonomous smart contract
-        execution after the scheduled time. Actual distribution may be delayed by up to 1 hour.
+        <strong>Note:</strong> Distribution must be at least 32 seconds in the future.
+        Execution will occur automatically at the scheduled time via Massa's deferred calls.
+        Actual distribution may occur within 16-32 seconds of the scheduled time due to blockchain period boundaries (16s per period).
       </div>
     </div>
   );
