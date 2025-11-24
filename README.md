@@ -221,7 +221,8 @@ The countdown timer shows approximate time until distribution. Actual execution 
 
 ## 🔗 Additional Documentation
 
-- **[Project Summary](./PROJECT_SUMMARY.md)** - Detailed project overview and architecture
+- **[Architecture Documentation](./ARCHITECTURE.md)** - Comprehensive system architecture, data flow, and technical implementation details
+- **[Project Summary](./PROJECT_SUMMARY.md)** - Detailed project overview and features
 - **[Token Minting Guide](./TOKEN_MINTING_GUIDE.md)** - Instructions for MPOLLS token creation
 - **[Contract Analysis](./CONTRACT_ANALYSIS.md)** - Smart contract implementation details
 - **[Swap Setup Guide](./SWAP_SETUP.md)** - Token swap configuration and usage
