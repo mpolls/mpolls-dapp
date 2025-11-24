@@ -501,7 +501,10 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <div>{getDistributionTypeBadge(poll.distributionType || 0)}</div>
                           {poll.distributionType === 2 && poll.status === 'closed' && poll.distributionTime > 0 && (
-                            <DistributionCountdown distributionTime={poll.distributionTime} />
+                            <DistributionCountdown
+                              distributionTime={poll.distributionTime}
+                              rewardsDistributed={poll.rewardsDistributed}
+                            />
                           )}
                         </div>
                       </td>
@@ -541,7 +544,7 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
                           <button
                             className="action-btn claims-status"
                             onClick={() => handleViewClaimingStatus(poll)}
-                            title="View Claiming Status"
+                            title={poll.distributionType === 0 ? "View Claiming Status" : "View Distribution Status"}
                           >
                             <AssignmentIcon sx={{ fontSize: 18 }} />
                           </button>
@@ -563,7 +566,7 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
             <div className="modal-header">
               <h2>
                 <AssignmentIcon sx={{ fontSize: 28, marginRight: 1, verticalAlign: 'middle' }} />
-                Claiming Status: {selectedPollForClaiming.title}
+                {selectedPollForClaiming.distributionType === 0 ? 'Claiming' : 'Distribution'} Status: {selectedPollForClaiming.title}
               </h2>
               <button className="modal-close" onClick={() => setShowClaimingModal(false)}>
                 ✕
@@ -599,14 +602,14 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
 
               {claimingData.length > 0 ? (
                 <div className="voters-list">
-                  <h3>Voters & Claiming Status</h3>
+                  <h3>Voters & {selectedPollForClaiming.distributionType === 0 ? 'Claiming' : 'Distribution'} Status</h3>
                   <table className="voters-table">
                     <thead>
                       <tr>
                         <th>Voter Address</th>
                         <th>Option Voted</th>
-                        <th>Claim Status</th>
-                        <th>Claimed Amount</th>
+                        <th>{selectedPollForClaiming.distributionType === 0 ? 'Claim' : 'Distribution'} Status</th>
+                        <th>{selectedPollForClaiming.distributionType === 0 ? 'Claimed' : 'Distributed'} Amount</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -620,7 +623,9 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
                           <td>{selectedPollForClaiming.options[voter.option] || `Option ${voter.option}`}</td>
                           <td>
                             {voter.hasClaimed ? (
-                              <span className="claim-status claimed">✓ Claimed</span>
+                              <span className="claim-status claimed">
+                                ✓ {selectedPollForClaiming.distributionType === 0 ? 'Claimed' : 'Distributed'}
+                              </span>
                             ) : (
                               <span className="claim-status pending">⏳ Pending</span>
                             )}
@@ -717,15 +722,15 @@ const CreatorDashboard = ({ onBack, onViewPoll }: CreatorDashboardProps) => {
               />
             </div>
 
-            <div className="modal-footer">
+            <div className="modal-actions">
               <button
-                className="btn-primary"
+                className="save-btn"
                 onClick={handleConfirmDistributionTime}
                 disabled={distributionTimestamp === 0}
               >
                 Close Poll & Schedule Distribution
               </button>
-              <button className="btn-secondary" onClick={() => setShowDistributionModal(false)}>
+              <button className="cancel-btn" onClick={() => setShowDistributionModal(false)}>
                 Cancel
               </button>
             </div>

@@ -60,7 +60,18 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
   const totalSteps = 3;
   const [isStepChanging, setIsStepChanging] = useState(false);
 
+  // Field-level validation errors
+  const [fieldErrors, setFieldErrors] = useState({
+    title: "",
+    description: "",
+    endDateTime: "",
+    options: ""
+  });
+
   // Refs for form fields
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
+  const endDateTimeInputRef = useRef<HTMLInputElement>(null);
   const rewardPoolInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -103,6 +114,10 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
         ...prev,
         options: [...prev.options, ""]
       }));
+      // Clear options error when adding a new option
+      if (fieldErrors.options) {
+        setFieldErrors(prev => ({ ...prev, options: "" }));
+      }
     }
   };
 
@@ -120,6 +135,10 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
       ...prev,
       options: prev.options.map((option, i) => i === index ? value : option)
     }));
+    // Clear options error when user types
+    if (fieldErrors.options) {
+      setFieldErrors(prev => ({ ...prev, options: "" }));
+    }
   };
 
   const validateForm = () => {
@@ -158,23 +177,52 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
 
   const validateStep = (step: number): string | null => {
     setError("");
+    // Clear field errors
+    setFieldErrors({
+      title: "",
+      description: "",
+      endDateTime: "",
+      options: ""
+    });
 
     if (step === 1) {
       // Validate Step 1: Basic Info
-      if (!formData.title.trim()) return "Poll title is required";
-      if (!formData.description.trim()) return "Poll description is required";
-      if (!formData.endDateTime) return "End date/time is required";
+      if (!formData.title.trim()) {
+        setFieldErrors(prev => ({ ...prev, title: "Poll title is required" }));
+        titleInputRef.current?.focus();
+        return "Poll title is required";
+      }
+      if (!formData.description.trim()) {
+        setFieldErrors(prev => ({ ...prev, description: "Poll description is required" }));
+        descriptionInputRef.current?.focus();
+        return "Poll description is required";
+      }
+      if (!formData.endDateTime) {
+        setFieldErrors(prev => ({ ...prev, endDateTime: "End date/time is required" }));
+        endDateTimeInputRef.current?.focus();
+        return "End date/time is required";
+      }
 
       const endDate = new Date(formData.endDateTime);
       const now = new Date();
-      if (endDate <= now) return "End date/time must be in the future";
+      if (endDate <= now) {
+        setFieldErrors(prev => ({ ...prev, endDateTime: "End date/time must be in the future" }));
+        endDateTimeInputRef.current?.focus();
+        return "End date/time must be in the future";
+      }
     }
 
     if (step === 2) {
       // Validate Step 2: Options
       const validOptions = formData.options.filter(opt => opt.trim());
-      if (validOptions.length < 2) return "At least 2 options are required";
-      if (validOptions.length > 10) return "Maximum 10 options allowed";
+      if (validOptions.length < 2) {
+        setFieldErrors(prev => ({ ...prev, options: "At least 2 options are required" }));
+        return "At least 2 options are required";
+      }
+      if (validOptions.length > 10) {
+        setFieldErrors(prev => ({ ...prev, options: "Maximum 10 options allowed" }));
+        return "Maximum 10 options allowed";
+      }
     }
 
     if (step === 3) {
@@ -199,6 +247,13 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
       setCurrentStep(currentStep + 1);
       setError("");
       setRewardPoolError(""); // Clear any field-specific errors
+      // Clear all field errors on successful step navigation
+      setFieldErrors({
+        title: "",
+        description: "",
+        endDateTime: "",
+        options: ""
+      });
       window.scrollTo({ top: 0, behavior: 'smooth' });
       console.log('✅ Step advanced to:', currentStep + 1);
 
@@ -215,6 +270,13 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
       setCurrentStep(currentStep - 1);
       setError("");
       setRewardPoolError(""); // Clear any field-specific errors
+      // Clear all field errors when going back
+      setFieldErrors({
+        title: "",
+        description: "",
+        endDateTime: "",
+        options: ""
+      });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -462,25 +524,41 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                   <div className="form-group">
                     <label htmlFor="title">Poll Title *</label>
                     <input
+                      ref={titleInputRef}
                       type="text"
                       id="title"
                       value={formData.title}
-                      onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                      onChange={(e) => {
+                        setFormData(prev => ({ ...prev, title: e.target.value }));
+                        if (fieldErrors.title) {
+                          setFieldErrors(prev => ({ ...prev, title: "" }));
+                        }
+                      }}
                       placeholder="Enter your poll title"
                       maxLength={100}
+                      className={fieldErrors.title ? "error" : ""}
                     />
+                    {fieldErrors.title && <div className="field-error">{fieldErrors.title}</div>}
                   </div>
 
                   <div className="form-group">
                     <label htmlFor="description">Description *</label>
                     <textarea
+                      ref={descriptionInputRef}
                       id="description"
                       value={formData.description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      onChange={(e) => {
+                        setFormData(prev => ({ ...prev, description: e.target.value }));
+                        if (fieldErrors.description) {
+                          setFieldErrors(prev => ({ ...prev, description: "" }));
+                        }
+                      }}
                       placeholder="Describe your poll or contest"
                       rows={4}
                       maxLength={500}
+                      className={fieldErrors.description ? "error" : ""}
                     />
+                    {fieldErrors.description && <div className="field-error">{fieldErrors.description}</div>}
                   </div>
 
                   <div className="form-group">
@@ -511,12 +589,20 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                   <div className="form-group">
                     <label htmlFor="endDateTime">Poll End Date & Time *</label>
                     <input
+                      ref={endDateTimeInputRef}
                       type="datetime-local"
                       id="endDateTime"
                       value={formData.endDateTime}
-                      onChange={(e) => setFormData(prev => ({ ...prev, endDateTime: e.target.value }))}
+                      onChange={(e) => {
+                        setFormData(prev => ({ ...prev, endDateTime: e.target.value }));
+                        if (fieldErrors.endDateTime) {
+                          setFieldErrors(prev => ({ ...prev, endDateTime: "" }));
+                        }
+                      }}
                       min={new Date().toISOString().slice(0, 16)}
+                      className={fieldErrors.endDateTime ? "error" : ""}
                     />
+                    {fieldErrors.endDateTime && <div className="field-error">{fieldErrors.endDateTime}</div>}
                     <small>
                       {formData.endDateTime ? (
                         <>
@@ -617,6 +703,7 @@ const CreatePoll = ({ onBack }: CreatePollProps) => {
                       + Add Option
                     </button>
                   )}
+                  {fieldErrors.options && <div className="field-error">{fieldErrors.options}</div>}
                 </div>
               </div>
             )}
